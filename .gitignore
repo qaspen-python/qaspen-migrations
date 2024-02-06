@@ -164,5 +164,5 @@ cython_debug/
 __test.py
 migrations
 testconfig.toml
-test.py
-testsmodels
+test/*
+test.toml

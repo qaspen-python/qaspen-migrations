@@ -1,3 +1,4 @@
+import collections
 import typing
 from pathlib import Path
 
@@ -6,9 +7,15 @@ import toml
 from click import Context
 
 from qaspen_migrations.migrations import MigrationsManager, ModelsManager
-from qaspen_migrations.settings import QaspenMigrationsSettings
-from qaspen_migrations.utils import (as_coroutine,
-                                     convert_abs_path_to_relative, load_config)
+from qaspen_migrations.settings import (
+    QASPEN_MIGRATIONS_TOML_KEY,
+    QaspenMigrationsSettings,
+)
+from qaspen_migrations.utils import (
+    as_coroutine,
+    convert_abs_path_to_relative,
+    load_config,
+)
 
 
 @click.group()
@@ -42,36 +49,48 @@ def cli(ctx: Context, config: str) -> None:
     "--engine-path",
     show_default=False,
     help="Path to your qaspen engine.",
-    required=True,
+    required=False,
 )
 @click.pass_context
-def init(ctx: Context, migrations_path: str, engine_path: str) -> None:
+def init(
+    ctx: Context,
+    migrations_path: str,
+    engine_path: typing.Union[str, None],
+) -> None:
     config_path = ctx.obj["config_path"]
-
     rel_migrations_path: typing.Final = convert_abs_path_to_relative(
         migrations_path,
     )
-    engine_path, engine_object = engine_path.split(":")
-    rel_engine_path: typing.Final = convert_abs_path_to_relative(engine_path)
+
+    if engine_path is not None:
+        engine_path, engine_object = engine_path.split(":")
+        rel_engine_path: typing.Final = convert_abs_path_to_relative(
+            engine_path,
+        )
+        config_engine_path = f"{rel_engine_path}:{engine_object}"
+    else:
+        config_engine_path = "path.to.your.engine:object"
 
     if config_path.exists():
         content: typing.Final = config_path.read_text()
         settings = toml.loads(content)
     else:
-        settings = toml.loads("[tool.qaspen-migrations]")
+        settings = toml.loads(f"[tool.{QASPEN_MIGRATIONS_TOML_KEY}]")
 
-    settings["tool"]["qaspen"]["migrations"] = QaspenMigrationsSettings(
+    settings = collections.defaultdict(dict, **settings)
+
+    settings["tool"][QASPEN_MIGRATIONS_TOML_KEY] = QaspenMigrationsSettings(
         migrations_path=rel_migrations_path,
-        engine_path=f"{rel_engine_path}:{engine_object}",
+        engine_path=config_engine_path,
     ).model_dump()
     config_path.write_text(toml.dumps(settings))
     Path(rel_migrations_path).mkdir(parents=True, exist_ok=True)
 
     click.secho(
-        f"Success create migrate location {migrations_path}",
+        f"Successfully created migrations location {migrations_path}",
         fg="green",
     )
-    click.secho(f"Success write config to {config_path}", fg="green")
+    click.secho(f"Successful wrote a config to {config_path}", fg="green")
 
 
 @cli.command(help="Make migrations for provided models.")

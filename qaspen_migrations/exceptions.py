@@ -3,4 +3,8 @@ class QaspenMigrationsError(Exception):
 
 
 class ConfigurationError(QaspenMigrationsError):
-    """Base class for all exceptions."""
+    """Raises when configuration is invalid."""
+
+
+class FieldParsingError(QaspenMigrationsError):
+    """Raises when field or column cannot be parsed."""

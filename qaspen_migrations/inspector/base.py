@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 import typing
 from abc import ABC, abstractmethod
 
-from qaspen import BaseTable
+if typing.TYPE_CHECKING:
+    from qaspen import BaseTable
+
+    from qaspen_migrations.inspector.schema import TableDumpSchema
 
 Engine = typing.TypeVar(
     "Engine",
@@ -17,6 +22,6 @@ class BaseInspector(ABC, typing.Generic[Engine]):
     @abstractmethod
     async def inspect_database(
         self,
-        models: typing.List[typing.Type[BaseTable]],
-    ) -> None:
+        models: list[type[BaseTable]],
+    ) -> list[TableDumpSchema]:
         raise NotImplementedError

@@ -1,20 +1,24 @@
+from __future__ import annotations
+
 import dataclasses
+import importlib
 import typing
 
 from qaspen import BaseTable
 from qaspen.abc.db_engine import BaseEngine
 
 from qaspen_migrations.exceptions import ConfigurationError
-from qaspen_migrations.inspector.base import BaseInspector
 from qaspen_migrations.inspector.mapping import map_inspector
 from qaspen_migrations.models import QaspenMigration
-from qaspen_migrations.utils import import_module_by_path
+
+if typing.TYPE_CHECKING:
+    from qaspen_migrations.inspector.base import BaseInspector
 
 
 @dataclasses.dataclass()
 class ModelsManager:
-    model_paths: typing.List[str]
-    __models: typing.List[typing.Type[BaseTable]] = dataclasses.field(
+    model_paths: list[str]
+    __models: list[type[BaseTable]] = dataclasses.field(
         init=False,
         default_factory=list,
     )
@@ -26,7 +30,7 @@ class ModelsManager:
         self,
         models_file_path: str,
     ) -> None:
-        models_module: typing.Final = import_module_by_path(models_file_path)
+        models_module: typing.Final = importlib.import_module(models_file_path)
         for module_member in dir(models_module):
             models_module_attribute = getattr(
                 models_module,
@@ -50,7 +54,7 @@ class ModelsManager:
         self.__models.append(QaspenMigration)
 
     @property
-    def models(self) -> typing.List[typing.Type[BaseTable]]:
+    def models(self) -> list[type[BaseTable]]:
         return self.__models
 
 
@@ -59,16 +63,24 @@ class MigrationsManager:
     engine_path: str
     migrations_path: str
     models_manager: ModelsManager
-    __inspector: BaseInspector = dataclasses.field(init=False)
-    __engine: BaseEngine = dataclasses.field(init=False)
+    __inspector: BaseInspector[
+        BaseEngine[typing.Any, typing.Any, typing.Any]
+    ] = dataclasses.field(init=False)
+    __engine: BaseEngine[
+        typing.Any,
+        typing.Any,
+        typing.Any,
+    ] = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         self.__engine = self.__load_engine()
         self.__inspector = map_inspector(self.__engine)
 
-    def __load_engine(self) -> BaseEngine:
+    def __load_engine(
+        self,
+    ) -> BaseEngine[typing.Any, typing.Any, typing.Any]:
         engine_path, engine_object = self.engine_path.split(":")
-        engine_module: typing.Final = import_module_by_path(engine_path)
+        engine_module: typing.Final = importlib.import_module(engine_path)
 
         try:
             engine: typing.Final = getattr(engine_module, engine_object)
@@ -77,7 +89,13 @@ class MigrationsManager:
         if not issubclass(type(engine), BaseEngine):
             raise ConfigurationError("No engine object found.")
 
-        return engine
+        return typing.cast(
+            BaseEngine[typing.Any, typing.Any, typing.Any],
+            engine,
+        )
 
     async def make_migrations(self) -> None:
-        await self.__inspector.inspect_database(self.models_manager.models)
+        database_dump = await self.__inspector.inspect_database(
+            self.models_manager.models,
+        )
+        print(database_dump)

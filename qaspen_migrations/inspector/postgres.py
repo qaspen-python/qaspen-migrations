@@ -1,62 +1,70 @@
+from __future__ import annotations
+
 import contextlib
 import typing
 
 from psycopg.errors import UndefinedTable
-from qaspen import BaseTable
-from qaspen.querystring.querystring import QueryString
 from qaspen_psycopg.engine import PsycopgEngine
 
 from qaspen_migrations.inspector.base import BaseInspector
+from qaspen_migrations.inspector.schema import (
+    ColumnDataSchema,
+    TableDumpSchema,
+)
+
+if typing.TYPE_CHECKING:
+    from qaspen import BaseTable
 
 
 class PostgresInspector(BaseInspector[PsycopgEngine]):
     inspect_query = """
-        select
-        c.column_name,
-        col_description(
-            '{}' :: regclass, ordinal_position
-        ) as column_comment,
-        t.constraint_type as column_key,
-        udt_name as data_type,
-        is_nullable,
-        column_default,
-        character_maximum_length,
-        numeric_precision,
-        numeric_scale
-        from
-        information_schema.constraint_column_usage const
-        join information_schema.table_constraints t using (
-            table_catalog, table_schema, table_name,
-            constraint_catalog, constraint_schema,
-            constraint_name
-        )
-        right join information_schema.columns c using (
-            column_name, table_catalog, table_schema,
-            table_name
-        )
-        where
-        c.table_catalog = '{}'
-        and c.table_name = '{}'
-        and c.table_schema = '{}';
+        SELECT
+            c.column_name as column_name,
+            t.constraint_type as column_constraint,
+            udt_name as data_type,
+            is_nullable as is_null,
+            column_default as database_default,
+            character_maximum_length as max_length,
+            numeric_precision,
+            numeric_scale
+        FROM
+            information_schema.constraint_column_usage
+        CONST JOIN
+            information_schema.table_constraints t USING (
+                table_catalog, table_schema, table_name, constraint_catalog, constraint_schema, constraint_name
+            )
+        RIGHT JOIN
+            information_schema.columns c using (column_name, table_catalog, table_schema, table_name)
+        WHERE
+            c.table_catalog = '{}'
+            and c.table_name = '{}'
+            and c.table_schema = '{}';
     """
 
     async def inspect_database(
         self,
-        models: typing.List[typing.Type[BaseTable]],
-    ) -> None:
-        import asyncio
-
+        models: list[type[BaseTable]],
+    ) -> list[TableDumpSchema]:
+        database_dump: typing.Final = []
         for model in models:
-            await asyncio.sleep(1)
+            table_dump = TableDumpSchema(model=model)
+
             with contextlib.suppress(UndefinedTable):
                 inspect_result = await self.engine.execute(
-                    QueryString(
-                        model.schemed_original_table_name(),
+                    self.inspect_query.format(
                         self.engine.database,
                         model.original_table_name(),
                         model._table_meta.table_schema,
-                        sql_template=self.inspect_query,
+                        self.inspect_query,
                     ),
+                    [],
                 )
-                print(inspect_result)
+
+                for column_info in inspect_result:
+                    table_dump.add_column_data(
+                        ColumnDataSchema.from_database(column_info),
+                    )
+            database_dump.append(table_dump)
+
         await self.engine.stop_connection_pool()
+        return database_dump
