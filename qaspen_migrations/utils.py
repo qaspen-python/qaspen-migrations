@@ -23,10 +23,10 @@ def convert_abs_path_to_relative(path_to_convert: str | None) -> str:
     if path_to_convert is None:
         return "./"
 
-    if os.path.isabs(path_to_convert):
+    if os.path.isabs(path_to_convert):  # noqa: PTH117
         path_to_convert = os.path.relpath(
             path_to_convert,
-            os.getcwd(),
+            os.getcwd(),  # noqa: PTH109
         )
     if not path_to_convert.startswith("./"):
         path_to_convert = "./" + path_to_convert
@@ -76,7 +76,7 @@ def get_attribute_value_or_none_and_cast(
             attribute_name,
         )
         return cast_type(attribute_value)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 

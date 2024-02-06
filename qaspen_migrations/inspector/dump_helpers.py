@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typing
 
-from qaspen import BaseTable
+from qaspen import BaseTable  # noqa: TCH002
 
 from qaspen_migrations.inspector.schema import (
     ColumnDataSchema,

@@ -36,9 +36,18 @@ line-length = 79
 select = ["ALL"]
 fixable = ["ALL"]
 ignore = [
-    "ANN401", "D100", "D107", "SLF001", "D105", "D101",
-    "TRY003", "PLR0913", "FBT001", "FBT002", "ANN101",
-    "S608", "S101", "N805", "D102", "EM101", "EM102", "D103"
+    'ANN101', 'ANN401',
+    'D100', 'D101', 'D102', 'D103', 'D105', 'D107',
+    'EM101', 'EM102',
+    'FBT001', 'FBT002',
+    'FIX002',
+    'N805',
+    'PLR0913',
+    'S101',
+    'S608',
+    'SLF001',
+    'TD003',
+    'TRY003'
 ]
 exclude = ["qaspen/fields/operators.py"]
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing
 
 import pydantic
-from qaspen import BaseTable
+from qaspen import BaseTable  # noqa: TCH002
 
 from qaspen_migrations.exceptions import FieldParsingError
 from qaspen_migrations.utils import check_inclusion, get_int_attribute
