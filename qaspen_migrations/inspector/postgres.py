@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import contextlib
 import typing
 
-from psycopg.errors import UndefinedTable
 from qaspen_psycopg.engine import PsycopgEngine
 
 from qaspen_migrations.inspector.base import BaseInspector
 from qaspen_migrations.inspector.schema import (
-    ColumnDataSchema,
+    ColumnInfoSchema,
     TableDumpSchema,
 )
 
@@ -17,24 +15,17 @@ if typing.TYPE_CHECKING:
 
 
 class PostgresInspector(BaseInspector[PsycopgEngine]):
-    inspect_query = """
+    inspect_info_query = """
         SELECT
-            c.column_name as column_name,
-            t.constraint_type as column_constraint,
-            udt_name as data_type,
-            is_nullable as is_null,
-            column_default as database_default,
-            character_maximum_length as max_length,
-            numeric_precision,
-            numeric_scale
+            c.column_name,
+            c.udt_name AS data_type,
+            c.is_nullable,
+            c.column_default,
+            c.character_maximum_length AS max_length,
+            c.numeric_precision AS precision,
+            c.numeric_scale AS scale
         FROM
-            information_schema.constraint_column_usage
-        CONST JOIN
-            information_schema.table_constraints t USING (
-                table_catalog, table_schema, table_name, constraint_catalog, constraint_schema, constraint_name
-            )
-        RIGHT JOIN
-            information_schema.columns c using (column_name, table_catalog, table_schema, table_name)
+            information_schema.columns c
         WHERE
             c.table_catalog = '{}'
             and c.table_name = '{}'
@@ -43,27 +34,24 @@ class PostgresInspector(BaseInspector[PsycopgEngine]):
 
     async def inspect_database(
         self,
-        models: list[type[BaseTable]],
+        tables: list[type[BaseTable]],
     ) -> list[TableDumpSchema]:
         database_dump: typing.Final = []
-        for model in models:
-            table_dump = TableDumpSchema(model=model)
+        for table in tables:
+            table_dump = TableDumpSchema(table=table)
+            inspect_result = await self.engine.execute(
+                self.inspect_info_query.format(
+                    self.engine.database,
+                    table.original_table_name(),
+                    table._table_meta.table_schema,
+                ),
+                [],
+            )
 
-            with contextlib.suppress(UndefinedTable):
-                inspect_result = await self.engine.execute(
-                    self.inspect_query.format(
-                        self.engine.database,
-                        model.original_table_name(),
-                        model._table_meta.table_schema,
-                        self.inspect_query,
-                    ),
-                    [],
+            for column_info in inspect_result:
+                table_dump.add_column_data(
+                    ColumnInfoSchema.from_database(column_info),
                 )
-
-                for column_info in inspect_result:
-                    table_dump.add_column_data(
-                        ColumnDataSchema.from_database(column_info),
-                    )
             database_dump.append(table_dump)
 
         await self.engine.stop_connection_pool()

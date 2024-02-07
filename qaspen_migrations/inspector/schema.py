@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import re
 import typing
 
 import pydantic
 from qaspen import BaseTable  # noqa: TCH002
 
 from qaspen_migrations.exceptions import FieldParsingError
-from qaspen_migrations.utils import check_inclusion, get_int_attribute
+from qaspen_migrations.utils import (
+    get_int_attribute,
+)
 
 if typing.TYPE_CHECKING:
     from qaspen.fields.base import Field
@@ -25,38 +28,43 @@ def _parse_numeric_attributes(
         return None
 
 
-class ColumnDataSchema(pydantic.BaseModel):
+def _extract_min_and_max_from_check(
+    column_name: str,
+    check_clause: str | None,
+) -> tuple[float | None, float | None]:
+    if check_clause is None:
+        return None, None
+
+    min_pattern = rf"{column_name}\s*>=\s*(\d+)"
+    max_pattern = rf"{column_name}\s*<=\s*(\d+)"
+
+    # Search for minimum value
+    min_match = re.search(min_pattern, check_clause)
+    minimum_value = int(min_match.group(1)) if min_match else None
+
+    # Search for maximum value
+    max_match = re.search(max_pattern, check_clause)
+    maximum_value = int(max_match.group(1)) if max_match else None
+
+    return minimum_value, maximum_value
+
+
+class ColumnInfoSchema(pydantic.BaseModel):
     column_name: str
-    is_primary: bool = False
-    unique: bool = False
     is_null: bool = True
     database_default: typing.Any = None
     max_length: int | None = None
-    numeric_scale: int | None = None
-    numeric_precision: int | None = None
+    scale: int | None = None
+    precision: int | None = None
 
     @classmethod
     def from_database(
-        cls: type[ColumnDataSchema],
+        cls: type[ColumnInfoSchema],
         incoming_data: dict[typing.Any, typing.Any],
-    ) -> ColumnDataSchema:
+    ) -> ColumnInfoSchema:
         column_name: typing.Final = incoming_data.get("column_name")
         if column_name is None:
             raise FieldParsingError("Field name is empty.")
-
-        is_primary: typing.Final = check_inclusion(
-            "PRIMARY KEY",
-            incoming_data.get(
-                "column_constraint",
-            ),
-        )
-
-        unique: typing.Final = check_inclusion(
-            "UNIQUE",
-            incoming_data.get(
-                "column_constraint",
-            ),
-        )
 
         is_null: typing.Final = incoming_data.get("is_null") == "YES"
 
@@ -67,49 +75,45 @@ class ColumnDataSchema(pydantic.BaseModel):
             )
 
         max_length: typing.Final = incoming_data.get("max_length")
-        numeric_scale: typing.Final = _parse_numeric_attributes(
-            "numeric_scale",
+        scale: typing.Final = _parse_numeric_attributes(
+            "scale",
             incoming_data,
         )
-        numeric_precision: typing.Final = _parse_numeric_attributes(
-            "numeric_precision",
+        precision: typing.Final = _parse_numeric_attributes(
+            "precision",
             incoming_data,
         )
 
-        return ColumnDataSchema(
+        return ColumnInfoSchema(
             column_name=column_name,
-            is_primary=is_primary,
-            unique=unique,
             is_null=is_null,
             database_default=database_default,
             max_length=max_length,
-            numeric_scale=numeric_scale,
-            numeric_precision=numeric_precision,
+            scale=scale,
+            precision=precision,
         )
 
     @classmethod
     def from_field(
-        cls: type[ColumnDataSchema],
+        cls: type[ColumnInfoSchema],
         model_field: Field[typing.Any],
-    ) -> ColumnDataSchema:
-        return ColumnDataSchema(
+    ) -> ColumnInfoSchema:
+        return ColumnInfoSchema(
             column_name=model_field.field_name,
-            is_primary=model_field.is_primary,  # type: ignore[attr-defined] # TODO(insani7y): add is_primary to qaspen core type:
-            unique=model_field.unique,  # type: ignore[attr-defined] # TODO(insani7y): add unique to qaspen core
             is_null=model_field.is_null,
             database_default=model_field.database_default,
-            max_length=get_int_attribute(model_field, "max_length"),
-            numeric_scale=get_int_attribute(model_field, "numeric_scale"),
-            numeric_precision=get_int_attribute(model_field, "numeric_scale"),
+            max_length=get_int_attribute(model_field, "_max_length"),
+            scale=get_int_attribute(model_field, "scale"),
+            precision=get_int_attribute(model_field, "precision"),
         )
 
 
 class TableDumpSchema(pydantic.BaseModel):
-    model: type[BaseTable]
-    column_data: list[ColumnDataSchema] = pydantic.Field(default_factory=list)
+    table: type[BaseTable]
+    column_info: list[ColumnInfoSchema] = pydantic.Field(default_factory=list)
 
     def add_column_data(
         self,
-        column_data: ColumnDataSchema,
+        column_data: ColumnInfoSchema,
     ) -> None:
-        self.column_data.append(column_data)
+        self.column_info.append(column_data)

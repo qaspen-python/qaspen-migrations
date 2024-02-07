@@ -9,60 +9,66 @@ from qaspen.abc.db_engine import BaseEngine
 
 from qaspen_migrations.exceptions import ConfigurationError
 from qaspen_migrations.inspector.mapping import map_inspector
-from qaspen_migrations.models import QaspenMigration
+from qaspen_migrations.tables import QaspenMigrationTable
 
 if typing.TYPE_CHECKING:
     from qaspen_migrations.inspector.base import BaseInspector
 
 
 @dataclasses.dataclass()
-class ModelsManager:
-    model_paths: list[str]
-    __models: list[type[BaseTable]] = dataclasses.field(
+class TableManager:
+    table_paths: list[str]
+    __tables: list[type[BaseTable]] = dataclasses.field(
         init=False,
         default_factory=list,
     )
 
     def __post_init__(self) -> None:
-        self.__load_models()
+        self.__tables = self.__load_tables()
 
-    def __load_models_from_file(
+    def __load_tables_from_module(
         self,
-        models_file_path: str,
-    ) -> None:
-        models_module: typing.Final = importlib.import_module(models_file_path)
-        for module_member in dir(models_module):
-            models_module_attribute = getattr(
-                models_module,
+        tables_file_path: str,
+    ) -> list[type[BaseTable]]:
+        module_tables: typing.Final[list[type[BaseTable]]] = []
+        tables_module: typing.Final = importlib.import_module(tables_file_path)
+        for module_member in dir(tables_module):
+            tables_module_attribute = getattr(
+                tables_module,
                 module_member,
             )
             try:
                 if (
                     issubclass(
-                        models_module_attribute,
+                        tables_module_attribute,
                         BaseTable,
                     )
-                    and not models_module_attribute._table_meta.abstract
+                    and not tables_module_attribute._table_meta.abstract
                 ):
-                    self.__models.append(models_module_attribute)
+                    module_tables.append(tables_module_attribute)
             except TypeError:
                 continue
 
-    def __load_models(self) -> None:
-        for model_path in self.model_paths:
-            self.__load_models_from_file(model_path)
-        self.__models.append(QaspenMigration)
+        return module_tables
+
+    def __load_tables(self) -> list[type[BaseTable]]:
+        tables: typing.Final = []
+        for model_path in self.table_paths:
+            tables.extend(self.__load_tables_from_module(model_path))
+
+        tables.append(QaspenMigrationTable)
+        return tables
 
     @property
-    def models(self) -> list[type[BaseTable]]:
-        return self.__models
+    def tables(self) -> list[type[BaseTable]]:
+        return self.__tables
 
 
 @dataclasses.dataclass
 class MigrationsManager:
     engine_path: str
     migrations_path: str
-    models_manager: ModelsManager
+    table_manager: TableManager
     __inspector: BaseInspector[
         BaseEngine[typing.Any, typing.Any, typing.Any]
     ] = dataclasses.field(init=False)
@@ -96,6 +102,6 @@ class MigrationsManager:
 
     async def make_migrations(self) -> None:
         database_dump = await self.__inspector.inspect_database(
-            self.models_manager.models,
+            self.table_manager.tables,
         )
-        print(database_dump)
+        print(database_dump)  # noqa: T201

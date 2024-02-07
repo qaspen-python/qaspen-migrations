@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import collections
 import typing
 from pathlib import Path
@@ -6,7 +8,7 @@ import click
 import toml
 from click import Context
 
-from qaspen_migrations.migrations import MigrationsManager, ModelsManager
+from qaspen_migrations.migrations import MigrationsManager, TableManager
 from qaspen_migrations.settings import (
     QASPEN_MIGRATIONS_TOML_KEY,
     QaspenMigrationsSettings,
@@ -55,7 +57,7 @@ def cli(ctx: Context, config: str) -> None:
 def init(
     ctx: Context,
     migrations_path: str,
-    engine_path: typing.Union[str, None],
+    engine_path: str | None,
 ) -> None:
     config_path = ctx.obj["config_path"]
     rel_migrations_path: typing.Final = convert_abs_path_to_relative(
@@ -93,7 +95,7 @@ def init(
     click.secho(f"Successful wrote a config to {config_path}", fg="green")
 
 
-@cli.command(help="Make migrations for provided models.")
+@cli.command(help="Make migrations for provided tables.")
 @click.pass_context
 @as_coroutine
 async def makemigrations(ctx: Context) -> None:
@@ -103,7 +105,7 @@ async def makemigrations(ctx: Context) -> None:
     migrations_manager: typing.Final = MigrationsManager(
         engine_path=migrations_config.engine_path,
         migrations_path=migrations_config.migrations_path,
-        models_manager=ModelsManager(migrations_config.models),
+        table_manager=TableManager(migrations_config.tables),
     )
     await migrations_manager.make_migrations()
 
@@ -114,7 +116,7 @@ def migrate(ctx: Context) -> None:
     migrations_config = ctx.obj["config"]
     assert isinstance(migrations_config, QaspenMigrationsSettings)
 
-    print("Migrate!")
+    print("Migrate!")  # noqa: T201
 
 
 @cli.command(help="Rollback migrations to certain version.")
@@ -127,4 +129,4 @@ def rollback(ctx: Context) -> None:
     migrations_config = ctx.obj["config"]
     assert isinstance(migrations_config, QaspenMigrationsSettings)
 
-    print("Rollback!")
+    print("Rollback!")  # noqa: T201

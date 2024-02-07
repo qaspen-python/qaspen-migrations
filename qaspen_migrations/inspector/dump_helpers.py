@@ -5,7 +5,7 @@ import typing
 from qaspen import BaseTable  # noqa: TCH002
 
 from qaspen_migrations.inspector.schema import (
-    ColumnDataSchema,
+    ColumnInfoSchema,
     TableDumpSchema,
 )
 
@@ -14,10 +14,10 @@ if typing.TYPE_CHECKING:
 
 
 def dump_qaspen_model_to_model_dump(
-    model: type[BaseTable],
+    table: type[BaseTable],
 ) -> TableDumpSchema:
-    table_dump: typing.Final = TableDumpSchema(model=model)
+    table_dump: typing.Final = TableDumpSchema(table=table)
     model_field: Field[typing.Any]
-    for model_field in model.all_fields():
-        table_dump.add_column_data(ColumnDataSchema.from_field(model_field))
+    for model_field in table.all_fields():
+        table_dump.add_column_data(ColumnInfoSchema.from_field(model_field))
     return table_dump

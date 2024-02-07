@@ -80,14 +80,23 @@ def get_attribute_value_or_none_and_cast(
         return None
 
 
-get_int_attribute: typing.Final = functools.partial(
-    get_attribute_value_or_none_and_cast,
-    cast_type=int,
-)
+def get_int_attribute(
+    object_to_get_from: typing.Any,
+    attribute_name: str,
+) -> int | None:
+    return get_attribute_value_or_none_and_cast(
+        object_to_get_from,
+        attribute_name,
+        cast_type=int,
+    )
 
 
-def check_inclusion(
-    value_to_check: str,
-    inclusion_value: str | None,
-) -> bool:
-    return value_to_check in (inclusion_value or "")
+def get_float_attribute(
+    object_to_get_from: typing.Any,
+    attribute_name: str,
+) -> float | None:
+    return get_attribute_value_or_none_and_cast(
+        object_to_get_from,
+        attribute_name,
+        cast_type=float,
+    )

@@ -22,6 +22,6 @@ class BaseInspector(ABC, typing.Generic[Engine]):
     @abstractmethod
     async def inspect_database(
         self,
-        models: list[type[BaseTable]],
+        tables: list[type[BaseTable]],
     ) -> list[TableDumpSchema]:
         raise NotImplementedError
