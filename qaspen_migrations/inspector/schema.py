@@ -100,9 +100,9 @@ class ColumnInfoSchema(pydantic.BaseModel):
         model_field: Field[typing.Any],
     ) -> ColumnInfoSchema:
         return ColumnInfoSchema(
-            column_name=model_field.field_name,
-            is_null=model_field.is_null,
-            database_default=model_field.database_default,
+            column_name=model_field._field_data.field_name,
+            is_null=model_field._field_data.is_null,
+            database_default=model_field._field_data.database_default,
             max_length=get_int_attribute(model_field, "_max_length"),
             scale=get_int_attribute(model_field, "scale"),
             precision=get_int_attribute(model_field, "precision"),
