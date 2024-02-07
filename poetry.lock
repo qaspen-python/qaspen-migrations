@@ -944,18 +944,20 @@ files = [
 
 [[package]]
 name = "qaspen"
-version = "0.0.11a0"
+version = "0.0.12a0"
 description = ""
 optional = false
 python-versions = ">=3.8.1,<4.0"
 files = [
-    {file = "qaspen-0.0.11a0-py3-none-any.whl", hash = "sha256:66ee9a4edb7a62ca220f0dab690a51a07b9e4bada6e08edecbc05462d0375773"},
-    {file = "qaspen-0.0.11a0.tar.gz", hash = "sha256:4b86486ec7b31e682c841d664bfce35a726afbbe732eea8197f0c0f9929d3a84"},
+    {file = "qaspen-0.0.12a0-py3-none-any.whl", hash = "sha256:2b0de301ca3487594428a2fd06153902d66507302db19cc20f10d419d83a5a42"},
+    {file = "qaspen-0.0.12a0.tar.gz", hash = "sha256:d5440fc3001d87fe5a77c0545cf79369fdc309dbbbf05cdb5f0e38856ee6f844"},
 ]
 
 [package.dependencies]
 msgspec = ">=0.18.4,<0.19.0"
 pydantic = ">=2.4.2,<3.0.0"
+qaspen-psycopg = ">=0.0.9a0,<0.0.10"
+tomlkit = ">=0.12.3,<0.13.0"
 
 [[package]]
 name = "qaspen-psycopg"
@@ -1057,6 +1059,17 @@ python-versions = ">=3.7"
 files = [
     {file = "tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc"},
     {file = "tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f"},
+]
+
+[[package]]
+name = "tomlkit"
+version = "0.12.3"
+description = "Style preserving TOML library"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "tomlkit-0.12.3-py3-none-any.whl", hash = "sha256:b0a645a9156dc7cb5d3a1f0d4bab66db287fcb8e0430bdd4664a095ea16414ba"},
+    {file = "tomlkit-0.12.3.tar.gz", hash = "sha256:75baf5012d06501f07bee5bf8e801b9f343e7aac5a92581f20f80ce632e6b5a4"},
 ]
 
 [[package]]
@@ -1222,4 +1235,4 @@ tokenize-rt = ">=2.1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8.1,<4.0"
-content-hash = "789bc3de8b56be8298859ca8b9587182715a4d89b5720238f926212a6a74def6"
+content-hash = "3017d56e2273a332354fb20245942284ee84864b779a10b70d727f0150639cc6"
