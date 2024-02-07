@@ -67,14 +67,15 @@ class ColumnInfoSchema(pydantic.BaseModel):
             raise FieldParsingError("Field name is empty.")
 
         is_null: typing.Final = incoming_data.get("is_null") == "YES"
-
+        max_length: typing.Final = incoming_data.get("max_length")
         database_default = incoming_data.get("database_default")
         if isinstance(database_default, str):
             database_default = (
-                None if "nextval" in database_default else database_default
+                None
+                if "nextval" in database_default
+                else database_default.split("::")[0]
             )
 
-        max_length: typing.Final = incoming_data.get("max_length")
         scale: typing.Final = _parse_numeric_attributes(
             "scale",
             incoming_data,

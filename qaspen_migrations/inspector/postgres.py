@@ -19,8 +19,8 @@ class PostgresInspector(BaseInspector[PsycopgEngine]):
         SELECT
             c.column_name,
             c.udt_name AS data_type,
-            c.is_nullable,
-            c.column_default,
+            c.is_nullable as is_null,
+            c.column_default as database_default,
             c.character_maximum_length AS max_length,
             c.numeric_precision AS precision,
             c.numeric_scale AS scale
