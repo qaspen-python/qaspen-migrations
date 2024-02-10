@@ -8,3 +8,7 @@ class ConfigurationError(QaspenMigrationsError):
 
 class FieldParsingError(QaspenMigrationsError):
     """Raises when field or column cannot be parsed."""
+
+
+class InconsistentTableError(QaspenMigrationsError):
+    """Raises when local table doesn't match table from database."""

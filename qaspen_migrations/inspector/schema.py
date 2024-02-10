@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import typing
 
 import pydantic
@@ -13,6 +12,39 @@ from qaspen_migrations.utils import (
 
 if typing.TYPE_CHECKING:
     from qaspen.fields.base import Field
+
+
+class ColumnInfoSchema(pydantic.BaseModel):
+    column_name: str
+    is_null: bool = True
+    database_default: str | None = None
+    max_length: int | None = None
+    scale: int | None = None
+    precision: int | None = None
+
+    def __hash__(self) -> int:
+        return hash(tuple(self.model_dump().values()))
+
+    @classmethod
+    def from_database(
+        cls: type[ColumnInfoSchema],
+        incoming_data: dict[typing.Any, typing.Any],
+    ) -> ColumnInfoSchema:
+        raise NotImplementedError
+
+    @classmethod
+    def from_field(
+        cls: type[ColumnInfoSchema],
+        model_field: Field[typing.Any],
+    ) -> ColumnInfoSchema:
+        return ColumnInfoSchema(
+            column_name=model_field._field_data.field_name,
+            is_null=model_field._field_data.is_null,
+            database_default=model_field._field_data.database_default,
+            max_length=get_int_attribute(model_field, "_max_length"),
+            scale=get_int_attribute(model_field, "scale"),
+            precision=get_int_attribute(model_field, "precision"),
+        )
 
 
 def _parse_numeric_attributes(
@@ -28,35 +60,7 @@ def _parse_numeric_attributes(
         return None
 
 
-def _extract_min_and_max_from_check(
-    column_name: str,
-    check_clause: str | None,
-) -> tuple[float | None, float | None]:
-    if check_clause is None:
-        return None, None
-
-    min_pattern = rf"{column_name}\s*>=\s*(\d+)"
-    max_pattern = rf"{column_name}\s*<=\s*(\d+)"
-
-    # Search for minimum value
-    min_match = re.search(min_pattern, check_clause)
-    minimum_value = int(min_match.group(1)) if min_match else None
-
-    # Search for maximum value
-    max_match = re.search(max_pattern, check_clause)
-    maximum_value = int(max_match.group(1)) if max_match else None
-
-    return minimum_value, maximum_value
-
-
-class ColumnInfoSchema(pydantic.BaseModel):
-    column_name: str
-    is_null: bool = True
-    database_default: typing.Any = None
-    max_length: int | None = None
-    scale: int | None = None
-    precision: int | None = None
-
+class PostgresColumnInfoSchema(ColumnInfoSchema):
     @classmethod
     def from_database(
         cls: type[ColumnInfoSchema],
@@ -94,27 +98,59 @@ class ColumnInfoSchema(pydantic.BaseModel):
             precision=precision,
         )
 
-    @classmethod
-    def from_field(
-        cls: type[ColumnInfoSchema],
-        model_field: Field[typing.Any],
-    ) -> ColumnInfoSchema:
-        return ColumnInfoSchema(
-            column_name=model_field._field_data.field_name,
-            is_null=model_field._field_data.is_null,
-            database_default=model_field._field_data.database_default,
-            max_length=get_int_attribute(model_field, "_max_length"),
-            scale=get_int_attribute(model_field, "scale"),
-            precision=get_int_attribute(model_field, "precision"),
-        )
-
 
 class TableDumpSchema(pydantic.BaseModel):
     table: type[BaseTable]
-    column_info: list[ColumnInfoSchema] = pydantic.Field(default_factory=list)
+    column_info_set: set[ColumnInfoSchema] = pydantic.Field(
+        default_factory=set,
+    )
 
     def add_column_data(
         self,
         column_data: ColumnInfoSchema,
     ) -> None:
-        self.column_info.append(column_data)
+        self.column_info_set.add(column_data)
+
+    def all_column_names(self) -> set[str]:
+        return {
+            column_info.column_name for column_info in self.column_info_set
+        }
+
+
+class MigrationChangesSchema(pydantic.BaseModel):
+    table: type[BaseTable]
+    to_create_columns: set[ColumnInfoSchema] = pydantic.Field(
+        default_factory=set,
+    )
+    to_update_columns: set[
+        tuple[ColumnInfoSchema, ColumnInfoSchema]
+    ] = pydantic.Field(
+        default_factory=set,
+    )
+    to_delete_columns: set[ColumnInfoSchema] = pydantic.Field(
+        default_factory=set,
+    )
+
+    @property
+    def should_create_table(self) -> bool:
+        return (
+            bool(self.to_create_columns)
+            and not bool(self.to_update_columns)
+            and not bool(self.to_delete_columns)
+        )
+
+    @property
+    def should_skip_table(self) -> bool:
+        return (
+            not bool(self.to_create_columns)
+            and not bool(self.to_update_columns)
+            and not bool(self.to_delete_columns)
+        )
+
+    @property
+    def should_drop_table(self) -> bool:
+        return (
+            not bool(self.to_create_columns)
+            and not bool(self.to_update_columns)
+            and bool(self.to_delete_columns)
+        )

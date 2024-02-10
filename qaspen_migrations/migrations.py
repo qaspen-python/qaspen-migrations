@@ -70,7 +70,8 @@ class MigrationsManager:
     migrations_path: str
     table_manager: TableManager
     __inspector: BaseInspector[
-        BaseEngine[typing.Any, typing.Any, typing.Any]
+        typing.Any,
+        BaseEngine[typing.Any, typing.Any, typing.Any],
     ] = dataclasses.field(init=False)
     __engine: BaseEngine[
         typing.Any,
@@ -80,7 +81,10 @@ class MigrationsManager:
 
     def __post_init__(self) -> None:
         self.__engine = self.__load_engine()
-        self.__inspector = map_inspector(self.__engine)
+        self.__inspector = map_inspector(
+            self.__engine,
+            self.table_manager.tables,
+        )
 
     def __load_engine(
         self,
@@ -101,7 +105,4 @@ class MigrationsManager:
         )
 
     async def make_migrations(self) -> None:
-        database_dump = await self.__inspector.inspect_database(
-            self.table_manager.tables,
-        )
-        print(database_dump)  # noqa: T201
+        print(await self.__inspector.generate_migration_changes())  # noqa: T201

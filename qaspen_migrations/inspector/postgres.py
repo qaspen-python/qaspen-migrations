@@ -5,16 +5,16 @@ import typing
 from qaspen_psycopg.engine import PsycopgEngine
 
 from qaspen_migrations.inspector.base import BaseInspector
-from qaspen_migrations.inspector.schema import (
-    ColumnInfoSchema,
-    TableDumpSchema,
-)
+from qaspen_migrations.inspector.schema import PostgresColumnInfoSchema
 
 if typing.TYPE_CHECKING:
     from qaspen import BaseTable
 
 
-class PostgresInspector(BaseInspector[PsycopgEngine]):
+class PostgresInspector(
+    BaseInspector[PostgresColumnInfoSchema, PsycopgEngine],
+):
+    schema_type = PostgresColumnInfoSchema
     inspect_info_query = """
         SELECT
             c.column_name,
@@ -32,27 +32,9 @@ class PostgresInspector(BaseInspector[PsycopgEngine]):
             and c.table_schema = '{}';
     """
 
-    async def inspect_database(
-        self,
-        tables: list[type[BaseTable]],
-    ) -> list[TableDumpSchema]:
-        database_dump: typing.Final = []
-        for table in tables:
-            table_dump = TableDumpSchema(table=table)
-            inspect_result = await self.engine.execute(
-                self.inspect_info_query.format(
-                    self.engine.database,
-                    table.original_table_name(),
-                    table._table_meta.table_schema,
-                ),
-                [],
-            )
-
-            for column_info in inspect_result:
-                table_dump.add_column_data(
-                    ColumnInfoSchema.from_database(column_info),
-                )
-            database_dump.append(table_dump)
-
-        await self.engine.stop_connection_pool()
-        return database_dump
+    def build_inspect_info_query(self, table: type[BaseTable]) -> str:
+        return self.inspect_info_query.format(
+            self.engine.database,
+            table.original_table_name(),
+            table._table_meta.table_schema,
+        )
