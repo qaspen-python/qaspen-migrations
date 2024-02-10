@@ -10,5 +10,5 @@ class FieldParsingError(QaspenMigrationsError):
     """Raises when field or column cannot be parsed."""
 
 
-class InconsistentTableError(QaspenMigrationsError):
-    """Raises when local table doesn't match table from database."""
+class MigrationGenerationError(QaspenMigrationsError):
+    """Raises when migration generation proccess cannot be completed."""

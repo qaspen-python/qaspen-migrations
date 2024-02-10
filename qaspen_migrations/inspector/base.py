@@ -6,7 +6,7 @@ import typing
 
 from qaspen.abc.db_engine import BaseEngine
 
-from qaspen_migrations.exceptions import InconsistentTableError
+from qaspen_migrations.exceptions import MigrationGenerationError
 from qaspen_migrations.inspector.schema import (
     ColumnInfoSchema,
     MigrationChangesSchema,
@@ -91,7 +91,12 @@ class BaseInspector(
                 table_dump_from_local_state.table
                 != table_dump_from_database.table
             ):
-                raise InconsistentTableError
+                raise MigrationGenerationError(
+                    "Local table name doesn't match "
+                    "table name from database: "
+                    f"{table_dump_from_local_state.table} "
+                    f"!= {table_dump_from_database.table}.",
+                )
 
             column_names_from_local_state = (
                 table_dump_from_local_state.all_column_names()
@@ -139,6 +144,15 @@ class BaseInspector(
                     key=lambda suspect_column: suspect_column.column_name,
                 ),
             ):
+                if (
+                    suspected_column_from_local_state.column_name
+                    != suspected_column_from_database.column_name
+                ):
+                    raise MigrationGenerationError(
+                        "Column names are not equal: "
+                        f"{suspected_column_from_local_state.column_name} "
+                        f"!= {suspected_column_from_database.column_name}.",
+                    )
                 # If suspected column schemas are not equal -
                 # column should be updated
                 #
