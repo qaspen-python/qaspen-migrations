@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import typing
 
 import pydantic
@@ -12,6 +11,7 @@ from qaspen_migrations.types_mapping import POSTGRES_TYPE_MAPPING
 from qaspen_migrations.utils import (
     get_int_attribute,
 )
+
 
 if typing.TYPE_CHECKING:
     from qaspen.fields.base import Field

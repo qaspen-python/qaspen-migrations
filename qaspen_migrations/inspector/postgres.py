@@ -1,11 +1,11 @@
 from __future__ import annotations
-
 import typing
 
 from qaspen_psycopg.engine import PsycopgEngine
 
 from qaspen_migrations.inspector.base import BaseInspector
 from qaspen_migrations.inspector.schema import PostgresColumnInfoSchema
+
 
 if typing.TYPE_CHECKING:
     from qaspen import BaseTable

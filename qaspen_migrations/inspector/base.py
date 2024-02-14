@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import abc
 import dataclasses
 import typing
@@ -10,6 +9,7 @@ from qaspen_migrations.inspector.schema import (
     ColumnInfoSchema,
     TableDumpSchema,
 )
+
 
 if typing.TYPE_CHECKING:
     from qaspen import BaseTable
