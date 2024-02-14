@@ -3,10 +3,6 @@ import typing
 from qaspen.sql_type import complex_types, primitive_types
 
 
-class TypedArray(complex_types.Array):
-    pass
-
-
 POSTGRES_TYPE_MAPPING: typing.Final = {
     "int2": primitive_types.SmallInt,
     "int4": primitive_types.Integer,

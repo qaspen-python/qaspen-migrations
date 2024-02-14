@@ -50,6 +50,11 @@ ignore = [
 ]
 exclude = ["qaspen/fields/operators.py"]
 
+[tool.ruff.isort]
+lines-after-imports = 2
+no-lines-before = ["standard-library", "local-folder"]
+
+
 [tool.black]
 line-length = 79
 

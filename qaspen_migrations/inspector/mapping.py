@@ -1,16 +1,17 @@
 from __future__ import annotations
-
 import typing
 
 from qaspen_migrations.exceptions import ConfigurationError
 from qaspen_migrations.inspector.base import BaseInspector
 from qaspen_migrations.inspector.postgres import PostgresInspector
 
+
 if typing.TYPE_CHECKING:
     from qaspen import BaseTable
     from qaspen.abc.db_engine import BaseEngine
 
     from qaspen_migrations.inspector.base import BaseInspector
+
 
 INSPECTOR_ENGINE_MAPPING: typing.Final[
     dict[str, type[BaseInspector[typing.Any, typing.Any]]]
