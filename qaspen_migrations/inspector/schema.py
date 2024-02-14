@@ -94,7 +94,11 @@ class PostgresColumnInfoSchema(ColumnInfoSchema):
             ) from exception
 
         is_null: typing.Final = incoming_data.get("is_null") == "YES"
-        max_length: typing.Final = incoming_data.get("max_length")
+        max_length: typing.Final = incoming_data.get(
+            "max_length",
+        ) or incoming_data.get(
+            "array_elements_length",
+        )
         database_default = incoming_data.get("database_default")
         scale: typing.Final = _parse_numeric_attributes(
             "scale",
