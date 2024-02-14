@@ -4,8 +4,11 @@ import typing
 
 import pydantic
 from qaspen import BaseTable  # noqa: TCH002
+from qaspen.fields import ArrayField
+from qaspen.sql_type.base import SQLType  # noqa: TCH002
 
 from qaspen_migrations.exceptions import FieldParsingError
+from qaspen_migrations.types_mapping import POSTGRES_TYPE_MAPPING
 from qaspen_migrations.utils import (
     get_int_attribute,
 )
@@ -16,6 +19,8 @@ if typing.TYPE_CHECKING:
 
 class ColumnInfoSchema(pydantic.BaseModel):
     column_name: str
+    sql_type: type[SQLType]
+    is_array: bool = False
     is_null: bool = True
     database_default: str | None = None
     max_length: int | None = None
@@ -37,8 +42,16 @@ class ColumnInfoSchema(pydantic.BaseModel):
         cls: type[ColumnInfoSchema],
         model_field: Field[typing.Any],
     ) -> ColumnInfoSchema:
+        sql_type = (
+            model_field.inner_field._sql_type
+            if isinstance(model_field, ArrayField)
+            else model_field._sql_type
+        )
+
         return ColumnInfoSchema(
             column_name=model_field._field_data.field_name,
+            is_array=isinstance(model_field, ArrayField),
+            sql_type=sql_type,
             is_null=model_field._field_data.is_null,
             database_default=model_field._field_data.database_default,
             max_length=get_int_attribute(model_field, "_max_length"),
@@ -70,16 +83,19 @@ class PostgresColumnInfoSchema(ColumnInfoSchema):
         if column_name is None:
             raise FieldParsingError("Field name is empty.")
 
+        incoming_type = incoming_data.get("sql_type", "")
+        try:
+            sql_type: typing.Final = POSTGRES_TYPE_MAPPING[
+                incoming_type.strip("_")
+            ]
+        except LookupError as exception:
+            raise FieldParsingError(
+                f"Unknown sql type '{incoming_type}'.",
+            ) from exception
+
         is_null: typing.Final = incoming_data.get("is_null") == "YES"
         max_length: typing.Final = incoming_data.get("max_length")
         database_default = incoming_data.get("database_default")
-        if isinstance(database_default, str):
-            database_default = (
-                None
-                if "nextval" in database_default
-                else database_default.split("::")[0]
-            )
-
         scale: typing.Final = _parse_numeric_attributes(
             "scale",
             incoming_data,
@@ -88,9 +104,11 @@ class PostgresColumnInfoSchema(ColumnInfoSchema):
             "precision",
             incoming_data,
         )
-
+        is_array: typing.Final = incoming_type.startswith("_")
         return ColumnInfoSchema(
             column_name=column_name,
+            is_array=is_array,
+            sql_type=sql_type,
             is_null=is_null,
             database_default=database_default,
             max_length=max_length,
