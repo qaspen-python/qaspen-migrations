@@ -1,10 +1,12 @@
+"""Module with column info schemas."""
 from __future__ import annotations
 import typing
 
 import pydantic
 from qaspen import BaseTable  # noqa: TCH002
 from qaspen.fields import ArrayField
-from qaspen.sql_type.base import SQLType  # noqa: TCH002
+from qaspen.sql_type import primitive_types
+from qaspen.sql_type.base import SQLType
 
 from qaspen_migrations.exceptions import FieldParsingError
 from qaspen_migrations.types_mapping import POSTGRES_TYPE_MAPPING
@@ -15,6 +17,19 @@ from qaspen_migrations.utils import (
 
 if typing.TYPE_CHECKING:
     from qaspen.fields.base import Field
+
+
+def prepare_string_value(column_info_value: typing.Any) -> str:
+    if isinstance(column_info_value, str):
+        return f'"{column_info_value}"'
+
+    if isinstance(column_info_value, (int, float, bool)):
+        return str(column_info_value)
+
+    if issubclass(column_info_value, SQLType):
+        return f"primitive_types.{column_info_value.__name__}"
+
+    return str(column_info_value)
 
 
 class ColumnInfoSchema(pydantic.BaseModel):
@@ -29,6 +44,19 @@ class ColumnInfoSchema(pydantic.BaseModel):
 
     def __hash__(self) -> int:
         return hash(tuple(self.model_dump().values()))
+
+    def __str__(self) -> str:
+        column_info_arguments: typing.Final = ",\n\t".join(
+            [
+                f"{column_info_key}={prepare_string_value(column_info_value)}"
+                for column_info_key, column_info_value in self.model_dump(
+                    exclude_defaults=True,
+                    exclude_none=True,
+                    exclude_unset=True,
+                ).items()
+            ],
+        )
+        return f"""ColumnInfoSchema(\n\t{column_info_arguments}\n)"""
 
     @classmethod
     def from_database(
@@ -62,10 +90,11 @@ class ColumnInfoSchema(pydantic.BaseModel):
 
 def _parse_numeric_attributes(
     attribute_name: str,
+    sql_type: type[SQLType],
     values: dict[typing.Any, typing.Any],
 ) -> int | None:
     attribute_value: typing.Final = values.get(attribute_name)
-    if values.get("data_type") not in ["decimal", "numeric"]:
+    if sql_type not in [primitive_types.Decimal, primitive_types.Numeric]:
         return None
     try:
         return int(attribute_value)  # type: ignore[arg-type]
@@ -94,18 +123,16 @@ class PostgresColumnInfoSchema(ColumnInfoSchema):
             ) from exception
 
         is_null: typing.Final = incoming_data.get("is_null") == "YES"
-        max_length: typing.Final = incoming_data.get(
-            "max_length",
-        ) or incoming_data.get(
-            "array_elements_length",
-        )
+        max_length: typing.Final = incoming_data.get("max_length")
         database_default = incoming_data.get("database_default")
         scale: typing.Final = _parse_numeric_attributes(
             "scale",
+            sql_type,
             incoming_data,
         )
         precision: typing.Final = _parse_numeric_attributes(
             "precision",
+            sql_type,
             incoming_data,
         )
         is_array: typing.Final = incoming_type.startswith("_")
@@ -137,42 +164,3 @@ class TableDumpSchema(pydantic.BaseModel):
         return {
             column_info.column_name for column_info in self.column_info_set
         }
-
-
-class MigrationChangesSchema(pydantic.BaseModel):
-    table: type[BaseTable]
-    to_create_columns: set[ColumnInfoSchema] = pydantic.Field(
-        default_factory=set,
-    )
-    to_update_columns: set[
-        tuple[ColumnInfoSchema, ColumnInfoSchema]
-    ] = pydantic.Field(
-        default_factory=set,
-    )
-    to_delete_columns: set[ColumnInfoSchema] = pydantic.Field(
-        default_factory=set,
-    )
-
-    @property
-    def should_create_table(self) -> bool:
-        return (
-            bool(self.to_create_columns)
-            and not bool(self.to_update_columns)
-            and not bool(self.to_delete_columns)
-        )
-
-    @property
-    def should_skip_table(self) -> bool:
-        return (
-            not bool(self.to_create_columns)
-            and not bool(self.to_update_columns)
-            and not bool(self.to_delete_columns)
-        )
-
-    @property
-    def should_drop_table(self) -> bool:
-        return (
-            not bool(self.to_create_columns)
-            and not bool(self.to_update_columns)
-            and bool(self.to_delete_columns)
-        )

@@ -5,7 +5,7 @@ import typing
 
 from qaspen.abc.db_engine import BaseEngine
 
-from qaspen_migrations.inspector.schema import (
+from qaspen_migrations.schema.column_info import (
     ColumnInfoSchema,
     TableDumpSchema,
 )

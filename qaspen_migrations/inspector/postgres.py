@@ -4,7 +4,7 @@ import typing
 from qaspen_psycopg.engine import PsycopgEngine
 
 from qaspen_migrations.inspector.base import BaseInspector
-from qaspen_migrations.inspector.schema import PostgresColumnInfoSchema
+from qaspen_migrations.schema.column_info import PostgresColumnInfoSchema
 
 
 if typing.TYPE_CHECKING:
@@ -15,20 +15,20 @@ class PostgresInspector(
     BaseInspector[PostgresColumnInfoSchema, PsycopgEngine],
 ):
     schema_type = PostgresColumnInfoSchema
+    # TODO: implement scale and precision fetching for decimal/numeric array types  # noqa: TD002, E501
     inspect_info_query = """
         SELECT
             ic.column_name,
             ic.udt_name AS sql_type,
             ic.is_nullable AS is_null,
             ic.column_default AS database_default,
-            ic.character_maximum_length AS max_length,
             ic.numeric_precision AS precision,
             ic.numeric_scale AS scale,
             CASE
                 WHEN att.atttypid = ANY (ARRAY[1002, 1015])
                     AND att.atttypmod > 0 THEN att.atttypmod - 4
-                ELSE NULL
-            END AS array_elements_length
+                ELSE ic.character_maximum_length
+            END AS max_length
         FROM
             information_schema.columns ic
         JOIN

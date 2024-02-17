@@ -6,21 +6,23 @@ import typing
 from qaspen import BaseTable
 from qaspen.abc.db_engine import BaseEngine
 
+from qaspen_migrations.ddl.mapping import map_ddl_generator
 from qaspen_migrations.exceptions import (
     ConfigurationError,
     MigrationGenerationError,
 )
 from qaspen_migrations.inspector.mapping import map_inspector
-from qaspen_migrations.inspector.schema import (
-    ColumnInfoSchema,
+from qaspen_migrations.schema.migration import (
     MigrationChangesSchema,
-    TableDumpSchema,
 )
 from qaspen_migrations.tables import QaspenMigrationTable
 
 
 if typing.TYPE_CHECKING:
-    from qaspen_migrations.inspector.base import BaseInspector
+    from qaspen_migrations.schema.column_info import (
+        ColumnInfoSchema,
+        TableDumpSchema,
+    )
 
 
 @dataclasses.dataclass()
@@ -77,10 +79,6 @@ class MigrationsManager:
     engine_path: str
     migrations_path: str
     table_manager: TableManager
-    __inspector: BaseInspector[
-        typing.Any,
-        BaseEngine[typing.Any, typing.Any, typing.Any],
-    ] = dataclasses.field(init=False)
     __engine: BaseEngine[
         typing.Any,
         typing.Any,
@@ -89,10 +87,6 @@ class MigrationsManager:
 
     def __post_init__(self) -> None:
         self.__engine = self.__load_engine()
-        self.__inspector = map_inspector(
-            self.__engine,
-            self.table_manager.tables,
-        )
 
     def __load_engine(
         self,
@@ -219,12 +213,19 @@ class MigrationsManager:
         return migration_changes
 
     async def make_migrations(self) -> None:
+        inspector: typing.Final = map_inspector(
+            self.__engine,
+            self.table_manager.tables,
+        )
         migration_changes: typing.Final = (
             await self.__generate_migration_changes(
-                self.__inspector.inspect_local_state(),
-                await self.__inspector.inspect_database(),
+                inspector.inspect_local_state(),
+                await inspector.inspect_database(),
             )
         )
+        ddl_generator: typing.Final = map_ddl_generator(
+            self.__engine,
+            migration_changes,
+        )
 
-        for table_dump in migration_changes:
-            print(table_dump)  # noqa: T201
+        to_apply, to_rollback = ddl_generator.generate_ddl_elements()
