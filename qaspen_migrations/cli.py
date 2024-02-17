@@ -7,15 +7,17 @@ import click
 import toml
 from click import Context
 
-from qaspen_migrations.migrations import MigrationsManager, TableManager
+from qaspen_migrations.migrations.maker import MigrationsMaker
 from qaspen_migrations.settings import (
     QASPEN_MIGRATIONS_TOML_KEY,
     QaspenMigrationsSettings,
 )
+from qaspen_migrations.table_loader import TableLoader
 from qaspen_migrations.utils import (
     as_coroutine,
     convert_abs_path_to_relative,
     load_config,
+    load_engine,
 )
 
 
@@ -101,12 +103,11 @@ async def makemigrations(ctx: Context) -> None:
     migrations_config = ctx.obj["config"]
     assert isinstance(migrations_config, QaspenMigrationsSettings)
 
-    migrations_manager: typing.Final = MigrationsManager(
-        engine_path=migrations_config.engine_path,
+    await MigrationsMaker(
+        engine=load_engine(migrations_config.engine_path),
         migrations_path=migrations_config.migrations_path,
-        table_manager=TableManager(migrations_config.tables),
-    )
-    await migrations_manager.make_migrations()
+        tables=TableLoader(migrations_config.tables).load_tables(),
+    ).make_migrations()
 
 
 @cli.command(help="Apply migrations.")

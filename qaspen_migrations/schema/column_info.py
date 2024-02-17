@@ -45,7 +45,7 @@ class ColumnInfoSchema(pydantic.BaseModel):
     def __hash__(self) -> int:
         return hash(tuple(self.model_dump().values()))
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         column_info_arguments: typing.Final = ",\n\t".join(
             [
                 f"{column_info_key}={prepare_string_value(column_info_value)}"
@@ -56,7 +56,9 @@ class ColumnInfoSchema(pydantic.BaseModel):
                 ).items()
             ],
         )
-        return f"""ColumnInfoSchema(\n\t{column_info_arguments}\n)"""
+        return f"""ColumnInfoSchema(
+            {column_info_arguments}
+        )"""
 
     @classmethod
     def from_database(

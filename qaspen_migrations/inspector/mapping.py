@@ -28,6 +28,6 @@ def map_inspector(
         return INSPECTOR_ENGINE_MAPPING[engine.engine_type](engine, tables)
     except LookupError as exc:
         raise ConfigurationError(
-            f"Invalid engine type {engine.engine_type}"
+            f"Invalid engine type {engine.engine_type}\n"
             f"Valid schemes: {', '.join(INSPECTOR_ENGINE_MAPPING.keys())}",
         ) from exc

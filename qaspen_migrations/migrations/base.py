@@ -15,9 +15,9 @@ class BaseMigration(abc.ABC):
     created_datetime: str
 
     @abc.abstractmethod
-    async def migrate(self) -> list[BaseDDLElement]:
+    def migrate(self) -> list[BaseDDLElement]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def rollback(self) -> list[BaseDDLElement]:
+    def rollback(self) -> list[BaseDDLElement]:
         raise NotImplementedError

@@ -4,12 +4,14 @@ import typing
 from qaspen_migrations.ddl.base import BaseDDLGenerator
 from qaspen_migrations.ddl.postgres import PostgresDDLGenerator
 from qaspen_migrations.exceptions import ConfigurationError
-from qaspen_migrations.schema.migration import MigrationChangesSchema
+from qaspen_migrations.schema.migration_changes import MigrationChangesSchema
 
 
 if typing.TYPE_CHECKING:
     from qaspen_migrations.ddl.base import BaseDDLGenerator
-    from qaspen_migrations.schema.migration import MigrationChangesSchema
+    from qaspen_migrations.schema.migration_changes import (
+        MigrationChangesSchema,
+    )
 
 
 if typing.TYPE_CHECKING:

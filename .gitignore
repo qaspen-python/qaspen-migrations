@@ -162,7 +162,7 @@ cython_debug/
 
 # Some testing
 __test.py
-migrations
+test_migrations
 testconfig.toml
 test/*
 test.toml

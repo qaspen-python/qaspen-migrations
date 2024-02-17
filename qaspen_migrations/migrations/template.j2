@@ -1,0 +1,36 @@
+from __future__ import annotations
+import typing
+
+from qaspen.sql_type import primitive_types
+
+from qaspen_migrations.migrations.base import BaseMigration
+from qaspen_migrations.schema.column_info import ColumnInfoSchema
+from qaspen_migrations.ddl.{{database_type}} import (
+    {% for ddl_element in ddl_elemets_to_import %}
+        {{ item }},
+    {% endfor %}
+)
+
+if typing.TYPE_CHECKING:
+    from qaspen_migrations.ddl.base import BaseDDLElement
+
+
+class Migration(BaseMigration):
+    version: str = "{{version | safe}}"
+    previous_version: str | None = {% if previous_version %}"{{ previous_version | safe }}"{% else %}None{% endif %}
+    created_datetime: str = "{{created_datetime | safe}}"
+
+
+    def migrate(self) -> list[BaseDDLElement]:
+        return [
+            {% for ddl_element in elements_to_migrate -%}
+                {{- ddl_element | safe}},
+            {% endfor %}
+        ]
+
+    def rollback(self) -> list[BaseDDLElement]:
+        return [
+            {% for ddl_element in elements_to_rollback -%}
+                {{- ddl_element | safe }},
+            {% endfor %}
+        ]

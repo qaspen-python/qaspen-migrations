@@ -12,6 +12,9 @@ pydantic = "^2.4.2"
 click = "^8.1.7"
 toml = "^0.10.2"
 qaspen-psycopg = "^0.0.9a0"
+aiofile = "^3.8.8"
+pytz = "^2024.1"
+types-pytz = "^2024.1.0.20240203"
 
 [tool.poetry.group.dev.dependencies]
 autoflake = "^2.2.1"

@@ -6,7 +6,9 @@ import typing
 
 if typing.TYPE_CHECKING:
     from qaspen_migrations.schema.column_info import ColumnInfoSchema
-    from qaspen_migrations.schema.migration import MigrationChangesSchema
+    from qaspen_migrations.schema.migration_changes import (
+        MigrationChangesSchema,
+    )
 
 
 class BaseDDLElement(abc.ABC):
@@ -19,6 +21,18 @@ class BaseDDLElement(abc.ABC):
 class BaseCreateTableDDLElement(BaseDDLElement):
     table_name_with_schema: str
     to_create_columns: list[ColumnInfoSchema]
+
+    def __repr__(self) -> str:
+        repr_to_create_columns = ",\n\t".join(
+            repr(to_create_column)
+            for to_create_column in self.to_create_columns
+        )
+        return f"""{type(self).__name__}(
+            table_with_schema={self.table_name_with_schema},
+            to_create_columns=[
+                {repr_to_create_columns}
+            ]
+        )"""
 
 
 @dataclasses.dataclass
@@ -162,19 +176,19 @@ class BaseDDLGenerator:
     def __generate_alter_column(
         self,
         table_name: str,
-        from_column_info: ColumnInfoSchema,
-        to_column_info: ColumnInfoSchema,
+        alter_from_column_info: ColumnInfoSchema,
+        alter_to_column_info: ColumnInfoSchema,
     ) -> None:
         self.__to_migrate_elements.append(
             self.alter_column_dll_element_type(
                 table_name,
-                to_column_info,
+                alter_to_column_info,
             ),
         )
         self.__to_rollback_elements.append(
             self.alter_column_dll_element_type(
                 table_name,
-                from_column_info,
+                alter_from_column_info,
             ),
         )
 
@@ -190,32 +204,35 @@ class BaseDDLGenerator:
             if migration_change.should_create_table:
                 self.__generate_create_table(
                     schemed_table_name,
-                    migration_change.to_create_columns,
+                    migration_change.to_add_columns,
                 )
                 continue
 
             if migration_change.should_drop_table:
                 self.__generate_drop_table(
                     schemed_table_name,
-                    migration_change.to_delete_columns,
+                    migration_change.to_drop_columns,
                 )
                 continue
 
-            for to_create_column in migration_change.to_create_columns:
+            for to_create_column in migration_change.to_add_columns:
                 self.__generate_add_column(
                     schemed_table_name,
                     to_create_column,
                 )
-            for to_delete_column in migration_change.to_delete_columns:
+            for to_delete_column in migration_change.to_drop_columns:
                 self.__generate_drop_column(
                     schemed_table_name,
                     to_delete_column,
                 )
-            for from_column, to_column in migration_change.to_update_columns:
+            for (
+                alter_from_column,
+                alter_to_column,
+            ) in migration_change.to_alter_columns:
                 self.__generate_alter_column(
                     schemed_table_name,
-                    from_column,
-                    to_column,
+                    alter_from_column,
+                    alter_to_column,
                 )
 
         return self.__to_migrate_elements, self.__to_rollback_elements

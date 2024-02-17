@@ -13,7 +13,7 @@ from qaspen_migrations.ddl.base import (
 
 class CreateTable(BaseCreateTableDDLElement):
     def to_database_expression(self) -> str:
-        table_columns_expressions: typing.Final = ",\n\t".join(
+        table_columns_expressions: typing.Final = ", \n\t".join(
             [
                 Column(column_info).to_database_expression()
                 for column_info in self.to_create_columns
@@ -124,7 +124,7 @@ class Column(BaseColumnDDlElement):
             f"{self.full_sql_type} "
             f"{self.is_null} "
             f"{self.database_default}"
-        )
+        ).strip(" ")
 
 
 class PostgresDDLGenerator(BaseDDLGenerator):
