@@ -211,7 +211,6 @@ class BaseDDLGenerator:
                     schemed_table_name,
                     to_delete_column,
                 )
-
             for from_column, to_column in migration_change.to_update_columns:
                 self.__generate_alter_column(
                     schemed_table_name,
