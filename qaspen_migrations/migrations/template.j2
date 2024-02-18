@@ -1,10 +1,9 @@
 from __future__ import annotations
 import typing
 
-from qaspen.sql_type import primitive_types
+from qaspen import fields
 
 from qaspen_migrations.migrations.base import BaseMigration
-from qaspen_migrations.schema.column_info import ColumnInfoSchema
 from qaspen_migrations.ddl.{{database_type}} import (
     {% for ddl_element in ddl_elemets_to_import %}
         {{ item }},

@@ -14,7 +14,7 @@ if typing.TYPE_CHECKING:
 
 
 INSPECTOR_ENGINE_MAPPING: typing.Final[
-    dict[str, type[BaseInspector[typing.Any, typing.Any]]]
+    dict[str, type[BaseInspector[typing.Any]]]
 ] = {
     "PSQLPsycopg": PostgresInspector,
 }
@@ -23,7 +23,7 @@ INSPECTOR_ENGINE_MAPPING: typing.Final[
 def map_inspector(
     engine: BaseEngine[typing.Any, typing.Any, typing.Any],
     tables: list[type[BaseTable]],
-) -> BaseInspector[typing.Any, BaseEngine[typing.Any, typing.Any, typing.Any]]:
+) -> BaseInspector[BaseEngine[typing.Any, typing.Any, typing.Any]]:
     try:
         return INSPECTOR_ENGINE_MAPPING[engine.engine_type](engine, tables)
     except LookupError as exc:

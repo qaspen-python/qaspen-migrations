@@ -5,13 +5,16 @@ import typing
 
 
 if typing.TYPE_CHECKING:
-    from qaspen_migrations.schema.column_info import ColumnInfoSchema
-    from qaspen_migrations.schema.migration_changes import (
+    from qaspen.fields.base import Field
+
+    from qaspen_migrations.schema import (
         MigrationChangesSchema,
     )
 
 
 class BaseDDLElement(abc.ABC):
+    table_field: Field[typing.Any]
+
     @abc.abstractmethod
     def to_database_expression(self) -> str:
         raise NotImplementedError
@@ -20,19 +23,7 @@ class BaseDDLElement(abc.ABC):
 @dataclasses.dataclass
 class BaseCreateTableDDLElement(BaseDDLElement):
     table_name_with_schema: str
-    to_create_columns: list[ColumnInfoSchema]
-
-    def __repr__(self) -> str:
-        repr_to_create_columns = ",\n\t".join(
-            repr(to_create_column)
-            for to_create_column in self.to_create_columns
-        )
-        return f"""{type(self).__name__}(
-            table_with_schema={self.table_name_with_schema},
-            to_create_columns=[
-                {repr_to_create_columns}
-            ]
-        )"""
+    to_create_fields: list[Field[typing.Any]]
 
 
 @dataclasses.dataclass
@@ -43,24 +34,24 @@ class BaseDropTableDDLElement(BaseDDLElement):
 @dataclasses.dataclass
 class BaseAlterColumnDDLElement(BaseDDLElement):
     table_name_with_schema: str
-    column_info: ColumnInfoSchema
+    table_field: Field[typing.Any]
 
 
 @dataclasses.dataclass
 class BaseAddColumnDDLElement(BaseDDLElement):
     table_name_with_schema: str
-    column_info: ColumnInfoSchema
+    table_field: Field[typing.Any]
 
 
 @dataclasses.dataclass
 class BaseDropColumnDDLElement(BaseDDLElement):
     table_name_with_schema: str
-    column_name: str
+    field_name: str
 
 
 @dataclasses.dataclass
 class BaseColumnDDlElement(BaseDDLElement):
-    column_info: ColumnInfoSchema
+    table_field: Field[typing.Any]
 
 
 @dataclasses.dataclass
@@ -106,12 +97,12 @@ class BaseDDLGenerator:
     def __generate_create_table(
         self,
         table_name: str,
-        to_create_columns: set[ColumnInfoSchema],
+        to_create_fields: set[Field[typing.Any]],
     ) -> None:
         self.__to_migrate_elements.append(
             self.create_table_dll_element_type(
                 table_name,
-                list(to_create_columns),
+                list(to_create_fields),
             ),
         )
         self.__to_rollback_elements.append(
@@ -123,7 +114,7 @@ class BaseDDLGenerator:
     def __generate_drop_table(
         self,
         table_name: str,
-        to_create_columns: set[ColumnInfoSchema],
+        to_create_fields: set[Field[typing.Any]],
     ) -> None:
         self.__to_migrate_elements.append(
             self.drop_table_dll_element_type(
@@ -133,62 +124,62 @@ class BaseDDLGenerator:
         self.__to_rollback_elements.append(
             self.create_table_dll_element_type(
                 table_name,
-                list(to_create_columns),
+                list(to_create_fields),
             ),
         )
 
     def __generate_add_column(
         self,
         table_name: str,
-        column_info: ColumnInfoSchema,
+        table_field: Field[typing.Any],
     ) -> None:
         self.__to_migrate_elements.append(
             self.add_column_dll_element_type(
                 table_name,
-                column_info,
+                table_field,
             ),
         )
         self.__to_rollback_elements.append(
             self.drop_column_dll_element_type(
                 table_name,
-                column_info.column_name,
+                table_field.field_name,
             ),
         )
 
     def __generate_drop_column(
         self,
         table_name: str,
-        column_info: ColumnInfoSchema,
+        table_field: Field[typing.Any],
     ) -> None:
         self.__to_migrate_elements.append(
             self.drop_column_dll_element_type(
                 table_name,
-                column_info.column_name,
+                table_field.field_name,
             ),
         )
         self.__to_rollback_elements.append(
             self.add_column_dll_element_type(
                 table_name,
-                column_info,
+                table_field,
             ),
         )
 
     def __generate_alter_column(
         self,
         table_name: str,
-        alter_from_column_info: ColumnInfoSchema,
-        alter_to_column_info: ColumnInfoSchema,
+        alter_from_table_field: Field[typing.Any],
+        alter_to_table_field: Field[typing.Any],
     ) -> None:
         self.__to_migrate_elements.append(
             self.alter_column_dll_element_type(
                 table_name,
-                alter_to_column_info,
+                alter_to_table_field,
             ),
         )
         self.__to_rollback_elements.append(
             self.alter_column_dll_element_type(
                 table_name,
-                alter_from_column_info,
+                alter_from_table_field,
             ),
         )
 
@@ -204,23 +195,23 @@ class BaseDDLGenerator:
             if migration_change.should_create_table:
                 self.__generate_create_table(
                     schemed_table_name,
-                    migration_change.to_add_columns,
+                    migration_change.to_add_fields,
                 )
                 continue
 
             if migration_change.should_drop_table:
                 self.__generate_drop_table(
                     schemed_table_name,
-                    migration_change.to_drop_columns,
+                    migration_change.to_drop_fields,
                 )
                 continue
 
-            for to_create_column in migration_change.to_add_columns:
+            for to_create_column in migration_change.to_add_fields:
                 self.__generate_add_column(
                     schemed_table_name,
                     to_create_column,
                 )
-            for to_delete_column in migration_change.to_drop_columns:
+            for to_delete_column in migration_change.to_drop_fields:
                 self.__generate_drop_column(
                     schemed_table_name,
                     to_delete_column,
@@ -228,7 +219,7 @@ class BaseDDLGenerator:
             for (
                 alter_from_column,
                 alter_to_column,
-            ) in migration_change.to_alter_columns:
+            ) in migration_change.to_alter_fields:
                 self.__generate_alter_column(
                     schemed_table_name,
                     alter_from_column,

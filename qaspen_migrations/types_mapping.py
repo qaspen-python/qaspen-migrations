@@ -1,26 +1,31 @@
+from __future__ import annotations
 import typing
 
-from qaspen.sql_type import complex_types, primitive_types
+from qaspen import fields
 
 
-POSTGRES_TYPE_MAPPING: typing.Final = {
-    "int2": primitive_types.SmallInt,
-    "int4": primitive_types.Integer,
-    "int8": primitive_types.BigInt,
-    "numeric": primitive_types.Decimal,
-    "float4": primitive_types.Real,
-    "float8": primitive_types.DoublePrecision,
-    "boolean": primitive_types.Boolean,
-    "varchar": primitive_types.VarChar,
-    "char": primitive_types.Char,
-    "text": primitive_types.Text,
-    "date": primitive_types.Date,
-    "time": primitive_types.Time,
-    "timetz": primitive_types.TimeTZ,
-    "timestamp": primitive_types.Timestamp,
-    "timestamptz": primitive_types.TimestampTZ,
-    "interval": primitive_types.Interval,
-    "json": complex_types.Json,
-    "jsonb": complex_types.Jsonb,
-    "array": complex_types.Array,
+if typing.TYPE_CHECKING:
+    from qaspen.fields.base import Field
+
+
+POSTGRES_TYPE_MAPPING: typing.Final[dict[str, type[Field[typing.Any]]]] = {
+    "int2": fields.SmallIntField,
+    "int4": fields.IntegerField,
+    "int8": fields.BigIntField,
+    "numeric": fields.DecimalField,
+    "float4": fields.RealField,
+    "float8": fields.DoublePrecisionField,
+    "boolean": fields.BooleanField,
+    "varchar": fields.VarCharField,
+    "char": fields.CharField,
+    "text": fields.TextField,
+    "date": fields.DateField,
+    "time": fields.TimeField,
+    "timetz": fields.TimeTZField,
+    "timestamp": fields.TimestampField,
+    "timestamptz": fields.TimestampTZField,
+    "interval": fields.IntervalField,
+    "json": fields.JsonField,
+    "jsonb": fields.JsonbField,
+    "array": fields.ArrayField,
 }

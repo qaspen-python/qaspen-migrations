@@ -8,19 +8,16 @@ from qaspen_migrations.exceptions import (
 )
 from qaspen_migrations.inspector.mapping import map_inspector
 from qaspen_migrations.migrations.writer import MigrationsWriter
-from qaspen_migrations.schema.migration_changes import (
+from qaspen_migrations.schema import (
     MigrationChangesSchema,
+    TableDumpSchema,
 )
 
 
 if typing.TYPE_CHECKING:
     from qaspen.abc.db_engine import BaseEngine
+    from qaspen.fields.base import Field
     from qaspen.table.base_table import BaseTable
-
-    from qaspen_migrations.schema.column_info import (
-        ColumnInfoSchema,
-        TableDumpSchema,
-    )
 
 
 @dataclasses.dataclass
@@ -45,6 +42,7 @@ class MigrationsMaker:
         )
 
         to_apply, to_rollback = ddl_generator.generate_ddl_elements()
+
         migrations_writer = MigrationsWriter(
             self.migrations_path,
             self.engine.engine_type,
@@ -73,85 +71,83 @@ def generate_migration_changes(
                 f"!= {table_dump_from_database.table}.",
             )
 
-        column_names_from_local_state = (
-            table_dump_from_local_state.all_column_names()
+        field_names_from_local_state = (
+            table_dump_from_local_state.all_field_names()
         )
-        column_names_from_database = (
-            table_dump_from_database.all_column_names()
-        )
-        # Get to add columns according to
-        # name column name presence in set from database
-        to_add_columns = {
-            column_info
-            for column_info in table_dump_from_local_state.column_info_set
-            if column_info.column_name not in column_names_from_database
+        field_names_from_database = table_dump_from_database.all_field_names()
+        # Get to add fields according to
+        # name field name presence in set from database
+        to_add_fields = {
+            field_info
+            for field_info in table_dump_from_local_state.table_fields_set
+            if field_info.field_name not in field_names_from_database
         }
-        # Get to drop columns according to
-        # name column name presence in set from local state
-        to_drop_columns = {
-            column_info
-            for column_info in table_dump_from_database.column_info_set
-            if column_info.column_name not in column_names_from_local_state
+        # Get to drop fields according to
+        # name field name presence in set from local state
+        to_drop_fields = {
+            field_info
+            for field_info in table_dump_from_database.table_fields_set
+            if field_info.field_name not in field_names_from_local_state
         }
 
-        # Columns are suspected for update
+        # Fields are suspected for update
         # if they are neither created nor deleted
-        suspected_for_update_columns_from_local_state = (
-            table_dump_from_local_state.column_info_set - to_add_columns
+        suspected_for_update_fields_from_local_state = (
+            table_dump_from_local_state.table_fields_set - to_add_fields
         )
-        suspected_for_update_columns_from_database = (
-            table_dump_from_database.column_info_set - to_drop_columns
+        suspected_for_update_fields_from_database = (
+            table_dump_from_database.table_fields_set - to_drop_fields
         )
 
-        to_alter_columns: set[
-            tuple[ColumnInfoSchema, ColumnInfoSchema]
+        to_alter_fields: set[
+            tuple[Field[typing.Any], Field[typing.Any]]
         ] = set()
         for (
-            suspected_column_from_local_state,
-            suspected_column_from_database,
+            suspected_field_from_local_state,
+            suspected_field_from_database,
         ) in zip(
             sorted(
-                suspected_for_update_columns_from_local_state,
-                key=lambda suspect_column: suspect_column.column_name,
+                suspected_for_update_fields_from_local_state,
+                key=lambda suspect_field: suspect_field.field_name,
             ),
             sorted(
-                suspected_for_update_columns_from_database,
-                key=lambda suspect_column: suspect_column.column_name,
+                suspected_for_update_fields_from_database,
+                key=lambda suspect_field: suspect_field.field_name,
             ),
         ):
             if (
-                suspected_column_from_local_state.column_name
-                != suspected_column_from_database.column_name
+                suspected_field_from_local_state.field_name
+                != suspected_field_from_database.field_name
             ):
                 raise MigrationGenerationError(
-                    "Column names are not equal: "
-                    f"{suspected_column_from_local_state.column_name} "
-                    f"!= {suspected_column_from_database.column_name}.",
+                    "field names are not equal: "
+                    f"{suspected_field_from_local_state.field_name} "
+                    f"!= {suspected_field_from_database.field_name}.",
                 )
-            # If suspected column schemas are not equal -
-            # column should be updated
+            # If suspected field schemas are not equal -
+            # field should be updated
             #
             # Here we are not looking for a name difference,
-            # because all such columns are already either in
-            # to_add_columns or to_drop_columns
+            # because all such fields are already either in
+            # to_add_fields or to_drop_fields
             if (
-                suspected_column_from_local_state
-                != suspected_column_from_database
+                suspected_field_from_local_state
+                != suspected_field_from_database
             ):
-                # Generating a tuple like (from_column, to_column)
-                to_alter_columns.add(
+                # Generating a tuple like (from_field, to_field)
+                to_alter_fields.add(
                     (
-                        suspected_column_from_database,
-                        suspected_column_from_local_state,
+                        suspected_field_from_database,
+                        suspected_field_from_local_state,
                     ),
                 )
 
         migration_changes.append(
             MigrationChangesSchema(
                 table=table_dump_from_local_state.table,
-                to_add_columns=to_add_columns,
-                to_alter_columns=to_alter_columns,
-                to_drop_columns=to_drop_columns,
+                to_add_fields=to_add_fields,
+                to_alter_fields=to_alter_fields,
+                to_drop_fields=to_drop_fields,
             ),
         )
 
