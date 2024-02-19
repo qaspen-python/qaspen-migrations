@@ -6,8 +6,8 @@ class ConfigurationError(QaspenMigrationsError):
     """Raises when configuration is invalid."""
 
 
-class FieldParsingError(QaspenMigrationsError):
-    """Raises when field or column cannot be parsed."""
+class ColumnParsingError(QaspenMigrationsError):
+    """Raises when column or column cannot be parsed."""
 
 
 class MigrationGenerationError(QaspenMigrationsError):

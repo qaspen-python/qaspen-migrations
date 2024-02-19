@@ -1,8 +1,5 @@
 from __future__ import annotations
-import asyncio
-import functools
 import importlib
-import os
 import typing
 
 import toml
@@ -18,22 +15,8 @@ from qaspen_migrations.settings import (
 if typing.TYPE_CHECKING:
     import pathlib
 
+
 T = typing.TypeVar("T")
-
-
-def convert_abs_path_to_relative(path_to_convert: str | None) -> str:
-    if path_to_convert is None:
-        return "./"
-
-    if os.path.isabs(path_to_convert):  # noqa: PTH117
-        path_to_convert = os.path.relpath(
-            path_to_convert,
-            os.getcwd(),  # noqa: PTH109
-        )
-    if not path_to_convert.startswith("./"):
-        path_to_convert = "./" + path_to_convert
-
-    return path_to_convert
 
 
 def load_config(config_path: pathlib.Path) -> QaspenMigrationsSettings:
@@ -73,51 +56,4 @@ def load_engine(
     return typing.cast(
         BaseEngine[typing.Any, typing.Any, typing.Any],
         engine,
-    )
-
-
-def as_coroutine(
-    func: typing.Callable[..., typing.Any],
-) -> typing.Callable[..., typing.Any]:
-    @functools.wraps(func)
-    def wrapper(*args: typing.Any, **kwargs: typing.Any) -> None:
-        asyncio.get_event_loop().run_until_complete(func(*args, **kwargs))
-
-    return wrapper
-
-
-def get_attribute_value_or_none_and_cast(
-    object_to_get_from: typing.Any,
-    attribute_name: str,
-    cast_type: typing.Callable[[typing.Any], T],
-) -> T | None:
-    try:
-        attribute_value: typing.Final = getattr(
-            object_to_get_from,
-            attribute_name,
-        )
-        return cast_type(attribute_value)
-    except Exception:  # noqa: BLE001
-        return None
-
-
-def get_int_attribute(
-    object_to_get_from: typing.Any,
-    attribute_name: str,
-) -> int | None:
-    return get_attribute_value_or_none_and_cast(
-        object_to_get_from,
-        attribute_name,
-        cast_type=int,
-    )
-
-
-def get_float_attribute(
-    object_to_get_from: typing.Any,
-    attribute_name: str,
-) -> float | None:
-    return get_attribute_value_or_none_and_cast(
-        object_to_get_from,
-        attribute_name,
-        cast_type=float,
     )

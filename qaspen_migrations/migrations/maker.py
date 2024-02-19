@@ -2,25 +2,25 @@ from __future__ import annotations
 import dataclasses
 import typing
 
-from qaspen_migrations.ddl.mapping import map_ddl_generator
 from qaspen_migrations.exceptions import (
     MigrationGenerationError,
 )
 from qaspen_migrations.inspector.mapping import map_inspector
 from qaspen_migrations.migrations.writer import MigrationsWriter
+from qaspen_migrations.operations.generator import OperationGenerator
 from qaspen_migrations.schema import (
-    MigrationChangesSchema,
-    TableDumpSchema,
+    ColumnInfo,
+    TableDiff,
+    TableDump,
 )
 
 
 if typing.TYPE_CHECKING:
     from qaspen.abc.db_engine import BaseEngine
-    from qaspen.fields.base import Field
     from qaspen.table.base_table import BaseTable
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True, frozen=True)
 class MigrationsMaker:
     engine: BaseEngine[
         typing.Any,
@@ -32,32 +32,28 @@ class MigrationsMaker:
 
     async def make_migrations(self) -> None:
         inspector: typing.Final = map_inspector(self.engine, self.tables)
-        migration_changes: typing.Final = generate_migration_changes(
+        table_diff: typing.Final = generate_tables_diff(
             inspector.inspect_local_state(),
             await inspector.inspect_database(),
         )
-        ddl_generator: typing.Final = map_ddl_generator(
-            self.engine,
-            migration_changes,
-        )
-
-        to_apply, to_rollback = ddl_generator.generate_ddl_elements()
+        operations_generator: typing.Final = OperationGenerator(table_diff)
+        to_migrate, to_rollback = operations_generator.generate_operations()
 
         migrations_writer = MigrationsWriter(
             self.migrations_path,
             self.engine.engine_type,
-            to_apply,
+            to_migrate,
             to_rollback,
         )
 
         await migrations_writer.save_migration()
 
 
-def generate_migration_changes(
-    dump_from_local_state: list[TableDumpSchema],
-    dump_from_database: list[TableDumpSchema],
-) -> list[MigrationChangesSchema]:
-    migration_changes: typing.Final = []
+def generate_tables_diff(
+    dump_from_local_state: list[TableDump],
+    dump_from_database: list[TableDump],
+) -> list[TableDiff]:
+    table_diff: typing.Final = []
 
     for table_dump_from_local_state, table_dump_from_database in zip(
         dump_from_local_state,
@@ -71,84 +67,84 @@ def generate_migration_changes(
                 f"!= {table_dump_from_database.table}.",
             )
 
-        field_names_from_local_state = (
-            table_dump_from_local_state.all_field_names()
+        column_names_from_local_state = (
+            table_dump_from_local_state.all_column_names()
         )
-        field_names_from_database = table_dump_from_database.all_field_names()
-        # Get to add fields according to
-        # name field name presence in set from database
-        to_add_fields = {
-            field_info
-            for field_info in table_dump_from_local_state.table_fields_set
-            if field_info.field_name not in field_names_from_database
+        column_names_from_database = (
+            table_dump_from_database.all_column_names()
+        )
+        # Get to add columns according to
+        # name column name presence in set from database
+        to_add_columns = {
+            column_info
+            for column_info in table_dump_from_local_state.table_columns
+            if column_info.db_column_name not in column_names_from_database
         }
-        # Get to drop fields according to
-        # name field name presence in set from local state
-        to_drop_fields = {
-            field_info
-            for field_info in table_dump_from_database.table_fields_set
-            if field_info.field_name not in field_names_from_local_state
+        # Get to drop columns according to
+        # name column name presence in set from local state
+        to_drop_columns = {
+            column_info
+            for column_info in table_dump_from_database.table_columns
+            if column_info.db_column_name not in column_names_from_local_state
         }
 
-        # Fields are suspected for update
+        # Columns are suspected for update
         # if they are neither created nor deleted
-        suspected_for_update_fields_from_local_state = (
-            table_dump_from_local_state.table_fields_set - to_add_fields
+        suspected_for_update_columns_from_local_state = (
+            table_dump_from_local_state.table_columns - to_add_columns
         )
-        suspected_for_update_fields_from_database = (
-            table_dump_from_database.table_fields_set - to_drop_fields
+        suspected_for_update_columns_from_database = (
+            table_dump_from_database.table_columns - to_drop_columns
         )
 
-        to_alter_fields: set[
-            tuple[Field[typing.Any], Field[typing.Any]]
-        ] = set()
+        to_alter_columns: set[tuple[ColumnInfo, ColumnInfo]] = set()
         for (
-            suspected_field_from_local_state,
-            suspected_field_from_database,
+            suspected_column_from_local_state,
+            suspected_column_from_database,
         ) in zip(
             sorted(
-                suspected_for_update_fields_from_local_state,
-                key=lambda suspect_field: suspect_field.field_name,
+                suspected_for_update_columns_from_local_state,
+                key=lambda suspect_column: suspect_column.db_column_name,
             ),
             sorted(
-                suspected_for_update_fields_from_database,
-                key=lambda suspect_field: suspect_field.field_name,
+                suspected_for_update_columns_from_database,
+                key=lambda suspect_column: suspect_column.db_column_name,
             ),
         ):
             if (
-                suspected_field_from_local_state.field_name
-                != suspected_field_from_database.field_name
+                suspected_column_from_local_state.db_column_name
+                != suspected_column_from_database.db_column_name
             ):
                 raise MigrationGenerationError(
-                    "field names are not equal: "
-                    f"{suspected_field_from_local_state.field_name} "
-                    f"!= {suspected_field_from_database.field_name}.",
+                    "column names are not equal: "
+                    f"{suspected_column_from_local_state.db_column_name} "
+                    f"!= {suspected_column_from_database.db_column_name}.",
                 )
-            # If suspected field schemas are not equal -
-            # field should be updated
+            # If suspected column schemas are not equal -
+            # column should be updated
             #
             # Here we are not looking for a name difference,
-            # because all such fields are already either in
-            # to_add_fields or to_drop_fields
+            # because all such columns are already either in
+            # to_add_columns or to_drop_columns
             if (
-                suspected_field_from_local_state
-                != suspected_field_from_database
+                suspected_column_from_local_state
+                != suspected_column_from_database
             ):
-                # Generating a tuple like (from_field, to_field)
-                to_alter_fields.add(
+                # Generating a tuple like (from_column, to_column)
+                to_alter_columns.add(
                     (
-                        suspected_field_from_database,
-                        suspected_field_from_local_state,
+                        suspected_column_from_database,
+                        suspected_column_from_local_state,
                     ),
                 )
 
-        migration_changes.append(
-            MigrationChangesSchema(
+        table_diff.append(
+            TableDiff(
                 table=table_dump_from_local_state.table,
-                to_add_fields=to_add_fields,
-                to_alter_fields=to_alter_fields,
-                to_drop_fields=to_drop_fields,
+                to_add_columns=to_add_columns,
+                to_alter_columns=to_alter_columns,
+                to_drop_columns=to_drop_columns,
             ),
         )
 
-    return migration_changes
+    return table_diff

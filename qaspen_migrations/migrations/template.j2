@@ -1,14 +1,9 @@
 from __future__ import annotations
 import typing
 
-from qaspen import fields
+from qaspen import columns
 
 from qaspen_migrations.migrations.base import BaseMigration
-from qaspen_migrations.ddl.{{database_type}} import (
-    {% for ddl_element in ddl_elemets_to_import %}
-        {{ item }},
-    {% endfor %}
-)
 
 if typing.TYPE_CHECKING:
     from qaspen_migrations.ddl.base import BaseDDLElement

@@ -13,12 +13,11 @@ from qaspen_migrations.settings import (
     QaspenMigrationsSettings,
 )
 from qaspen_migrations.table_loader import TableLoader
-from qaspen_migrations.utils import (
+from qaspen_migrations.utils.common import (
     as_coroutine,
     convert_abs_path_to_relative,
-    load_config,
-    load_engine,
 )
+from qaspen_migrations.utils.loaders import load_config, load_engine
 
 
 @click.group()
@@ -85,7 +84,7 @@ def init(
     settings["tool"][QASPEN_MIGRATIONS_TOML_KEY] = QaspenMigrationsSettings(
         migrations_path=rel_migrations_path,
         engine_path=config_engine_path,
-    ).model_dump()
+    ).to_dict()
     config_path.write_text(toml.dumps(settings))
     Path(rel_migrations_path).mkdir(parents=True, exist_ok=True)
 

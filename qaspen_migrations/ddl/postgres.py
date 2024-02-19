@@ -5,7 +5,6 @@ from qaspen_migrations.ddl.base import (
     BaseAlterColumnDDLElement,
     BaseColumnDDlElement,
     BaseCreateTableDDLElement,
-    BaseDDLGenerator,
     BaseDropColumnDDLElement,
     BaseDropTableDDLElement,
 )
@@ -13,16 +12,16 @@ from qaspen_migrations.ddl.base import (
 
 class CreateTable(BaseCreateTableDDLElement):
     def to_database_expression(self) -> str:
-        table_columns_expressions: typing.Final = ", \n\t".join(
+        column_database_expression: typing.Final = ", \n".join(
             [
-                Column(table_field).to_database_expression()
-                for table_field in self.to_create_fields
+                Column(column_info).to_database_expression()
+                for column_info in self.to_add_columns
             ],
         )
-        return (
-            f"CREATE TABLE {self.table_name_with_schema}"
-            f"(\n\t{table_columns_expressions}\n);"
-        )
+        return f"""
+                CREATE TABLE {self.table_name_with_schema}
+                ({column_database_expression});
+            """
 
 
 class DropTable(BaseDropTableDDLElement):
@@ -31,31 +30,54 @@ class DropTable(BaseDropTableDDLElement):
 
 
 class AlterColumn(BaseAlterColumnDDLElement):
-    @property
-    def alter_default(self) -> str:
-        return (
+    def __generate_alter_default(self) -> str:
+        default_expression: typing.Final = (
             "DROP DEFAULT"
-            if self.table_field.database_default is None
-            else f"SET DEFAULT {self.table_field.database_default}"
+            if self.to_column_info.database_default is None
+            else f"SET DEFAULT {self.to_column_info.database_default}"
+        )
+        return (
+            f"ALTER COLUMN {self.to_column_info.db_column_name} "
+            f"{default_expression}"
         )
 
-    @property
-    def alter_is_null(self) -> str:
-        return "DROP NOT NULL" if self.table_field.is_null else "SET NOT NULL"
+    def __generate_alter_is_null(self) -> str:
+        null_expression: typing.Final = (
+            "DROP NOT NULL" if self.to_column_info.is_null else "SET NOT NULL"
+        )
+        return (
+            f"ALTER COLUMN {self.to_column_info.db_column_name} "
+            f"{null_expression}"
+        )
 
-    @property
-    def alter_data_type(self) -> str:
-        return f"TYPE {Column(self.table_field).sql_type}"
+    def __generate_alter_data_type(self) -> str:
+        return (
+            f"ALTER COLUMN {self.to_column_info.db_column_name} "
+            f"TYPE {Column(self.to_column_info).full_sql_type}"
+        )
 
     def to_database_expression(self) -> str:
+        alter_statements: typing.Final = []
+
+        if (
+            self.to_column_info.database_default
+            != self.from_column_info.database_default
+        ):
+            alter_statements.append(self.__generate_alter_default())
+
+        if self.to_column_info.is_null != self.from_column_info.is_null:
+            alter_statements.append(self.__generate_alter_is_null())
+
+        if (
+            self.to_column_info.main_column_type
+            != self.from_column_info.main_column_type
+            or self.to_column_info.inner_column_type
+            != self.from_column_info.inner_column_type
+        ):
+            alter_statements.append(self.__generate_alter_data_type())
         return (
             f"ALTER TABLE {self.table_name_with_schema}\n"
-            f"\tALTER COLUMN {self.table_field.field_name} "
-            f"{self.alter_default},\n"
-            f"\tALTER COLUMN {self.table_field.field_name} "
-            f"{self.alter_is_null},\n"
-            f"\tALTER COLUMN {self.table_field.field_name} "
-            f"{self.alter_data_type};"
+            f"{' '.join(alter_statements)}"
         )
 
 
@@ -63,7 +85,7 @@ class AddColumn(BaseAddColumnDDLElement):
     def to_database_expression(self) -> str:
         return (
             f"ALTER TABLE {self.table_name_with_schema}\n\t"
-            f"ADD COLUMN {Column(self.table_field).to_database_expression()};"
+            f"ADD COLUMN {Column(self.column_info).to_database_expression()};"
         )
 
 
@@ -71,58 +93,61 @@ class DropColumn(BaseDropColumnDDLElement):
     def to_database_expression(self) -> str:
         return (
             f"ALTER TABLE {self.table_name_with_schema}"
-            f"DROP COLUMN {self.field_name};"
+            f"DROP COLUMN {self.column_name};"
         )
 
 
 class Column(BaseColumnDDlElement):
     @property
-    def field_name(self) -> str:
-        return self.table_field._field_data.field_name
+    def column_name(self) -> str:
+        return self.column_info.db_column_name
 
     @property
     def is_null(self) -> str:
-        return "NULL" if self.table_field.is_null else "NOT NULL"
+        return "NULL" if self.column_info.is_null else "NOT NULL"
 
     @property
-    def sql_type(self) -> str:
-        return self.table_field._field_type
+    def full_sql_type(self) -> str:
+        return f"{self.__sql_type}{self.__type_args}{self.__is_array}"
+
+    @property
+    def __sql_type(self) -> str:
+        if self.column_info.is_array:
+            assert self.column_info.inner_column_type is not None
+            return self.column_info.inner_column_type._sql_type.sql_type()
+
+        return self.column_info.main_column_type._sql_type.sql_type()
+
+    @property
+    def __is_array(self) -> str:
+        return "[]" if self.column_info.is_array else ""
 
     @property
     def database_default(self) -> str:
         return (
-            f"DEFAULT {self.table_field.database_default}"
-            if self.table_field.database_default
+            f"DEFAULT {self.column_info.database_default}"
+            if self.column_info.database_default
             else ""
         )
 
     @property
     def __type_args(self) -> str:
         resulting_args = []
-        if hasattr(self.table_field, "max_length"):
-            resulting_args.append(str(self.table_field.max_length))
+        if self.column_info.max_length is not None:
+            resulting_args.append(str(self.column_info.max_length))
 
-        if hasattr(self.table_field, "scale"):
-            resulting_args.append(str(self.table_field.scale))
+        if self.column_info.scale is not None:
+            resulting_args.append(str(self.column_info.scale))
 
-        if hasattr(self.table_field, "precision"):
-            resulting_args.append(str(self.table_field.precision))
+        if self.column_info.precision is not None:
+            resulting_args.append(str(self.column_info.precision))
 
         return f"({', '.join(resulting_args)})" if resulting_args else ""
 
     def to_database_expression(self) -> str:
         return (
-            f"{self.field_name} "
-            f"{self.sql_type} "
+            f"{self.column_name} "
+            f"{self.full_sql_type} "
             f"{self.is_null} "
             f"{self.database_default}"
         ).strip(" ")
-
-
-class PostgresDDLGenerator(BaseDDLGenerator):
-    create_table_dll_element_type = CreateTable
-    drop_table_dll_element_type = DropTable
-    alter_column_dll_element_type = AlterColumn
-    add_column_dll_element_type = AddColumn
-    drop_column_dll_element_type = DropColumn
-    column_dll_element_type = Column

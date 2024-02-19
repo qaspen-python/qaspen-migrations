@@ -8,7 +8,6 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
 anyio = "^4.0.0"
-pydantic = "^2.4.2"
 click = "^8.1.7"
 toml = "^0.10.2"
 qaspen-psycopg = "^0.0.9a0"
@@ -51,7 +50,7 @@ ignore = [
     'TD003',
     'TRY003'
 ]
-exclude = ["qaspen/fields/operators.py"]
+exclude = ["qaspen/columns/operators.py"]
 
 [tool.ruff.isort]
 lines-after-imports = 2

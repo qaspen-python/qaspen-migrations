@@ -11,7 +11,6 @@ import aiofile
 import pytz
 from jinja2 import Environment, FileSystemLoader
 
-from qaspen_migrations.exceptions import ConfigurationError
 from qaspen_migrations.settings import (
     MIGRATION_CREATED_DATETIME_FORMAT,
     QASPEN_MIGRATION_TEMPLATE_NAME,
@@ -20,8 +19,8 @@ from qaspen_migrations.settings import (
 
 
 if typing.TYPE_CHECKING:
-    from qaspen_migrations.ddl.base import BaseDDLElement
     from qaspen_migrations.migrations.base import BaseMigration
+    from qaspen_migrations.operations.base import BaseOperation
 
 
 jinja_environment: typing.Final = Environment(
@@ -59,8 +58,8 @@ class MigrationsOperator:
 class MigrationsWriter:
     migrations_path: str
     engine_type: str
-    to_migrate_ddl_elements: list[BaseDDLElement]
-    to_rollback_ddl_elements: list[BaseDDLElement]
+    to_migrate_operations: list[BaseOperation]
+    to_rollback_operations: list[BaseOperation]
     __migrations_loader: MigrationsOperator = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
@@ -68,16 +67,6 @@ class MigrationsWriter:
 
     def parse_ddl_elements_to_import(self) -> list[str]:
         return []
-
-    def parse_database_type_for_ddl(self) -> str:
-        try:
-            return ENGINE_TYPE_DATABASE_TYPE_FOR_DDL_MAP[self.engine_type]
-        except LookupError as exception:
-            raise ConfigurationError(
-                f"No DDL module for {self.engine_type} engine type.\n"
-                f"Valid types: "
-                f"{', '.join(ENGINE_TYPE_DATABASE_TYPE_FOR_DDL_MAP.keys())}",
-            ) from exception
 
     async def save_migration(self) -> str:
         new_migration_version: typing.Final = uuid.uuid4().hex[:10]
@@ -97,9 +86,8 @@ class MigrationsWriter:
                 created_datetime=new_migration_created_datetime,
                 previous_version=previous_migration_version,
                 ddl_elemets_to_import=self.parse_ddl_elements_to_import(),
-                elements_to_migrate=self.to_migrate_ddl_elements,
-                elements_to_rollback=self.to_rollback_ddl_elements,
-                database_type=self.parse_database_type_for_ddl(),
+                elements_to_migrate=self.to_migrate_operations,
+                elements_to_rollback=self.to_rollback_operations,
             )
         )
         async with aiofile.async_open(
