@@ -68,6 +68,13 @@ class MigrationsWriter:
     def parse_ddl_elements_to_import(self) -> list[str]:
         return []
 
+    def generate_migration_name(
+        self,
+        created_datetime: str,
+        version: str,
+    ) -> str:
+        return f"{created_datetime}.{version}.py"
+
     async def save_migration(self) -> str:
         new_migration_version: typing.Final = uuid.uuid4().hex[:10]
         new_migration_created_datetime: typing.Final = datetime.datetime.now(
@@ -91,7 +98,11 @@ class MigrationsWriter:
             )
         )
         async with aiofile.async_open(
-            pathlib.Path(self.migrations_path) / f"{new_migration_version}.py",
+            pathlib.Path(self.migrations_path)
+            / self.generate_migration_name(
+                new_migration_created_datetime,
+                new_migration_version,
+            ),
             "w",
         ) as new_migration_file:
             await new_migration_file.write(rendered_migration_template)
