@@ -68,9 +68,6 @@ class ColumnInfo:
     def is_array(self) -> bool:
         return issubclass(self.main_column_type, columns.ArrayColumn)
 
-    class Config:  # noqa: D106
-        arbitrary_types_allowed = True
-
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class TableDump:

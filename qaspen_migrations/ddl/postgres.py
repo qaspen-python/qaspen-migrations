@@ -12,7 +12,7 @@ from qaspen_migrations.ddl.base import (
 
 class CreateTable(BaseCreateTableDDLElement):
     def to_database_expression(self) -> str:
-        column_database_expression: typing.Final = ", \n".join(
+        column_database_expression: typing.Final = ",".join(
             [
                 Column(column_info).to_database_expression()
                 for column_info in self.to_add_columns
@@ -83,10 +83,10 @@ class AlterColumn(BaseAlterColumnDDLElement):
 
 class AddColumn(BaseAddColumnDDLElement):
     def to_database_expression(self) -> str:
-        return (
-            f"ALTER TABLE {self.table_name_with_schema}\n\t"
-            f"ADD COLUMN {Column(self.column_info).to_database_expression()};"
-        )
+        return f"""
+            ALTER TABLE {self.table_name_with_schema}
+            ADD COLUMN {Column(self.column_info).to_database_expression()};
+        """
 
 
 class DropColumn(BaseDropColumnDDLElement):

@@ -12,12 +12,15 @@ from qaspen_migrations.settings import (
     QASPEN_MIGRATIONS_TOML_KEY,
     QaspenMigrationsSettings,
 )
-from qaspen_migrations.table_loader import TableLoader
 from qaspen_migrations.utils.common import (
     as_coroutine,
     convert_abs_path_to_relative,
 )
-from qaspen_migrations.utils.loaders import load_config, load_engine
+from qaspen_migrations.utils.loaders import (
+    TableLoader,
+    load_config,
+    load_engine,
+)
 
 
 @click.group()

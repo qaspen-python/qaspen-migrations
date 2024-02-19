@@ -60,23 +60,11 @@ class BaseOperationsImplementer(
         DropColumnDDLElementType,
     ],
 ):
-    create_table_ddl: type[CreateTableDDLElementType] = dataclasses.field(
-        init=False,
-    )
-    drop_table_ddl: type[DropTableDDLElementType] = dataclasses.field(
-        init=False,
-    )
-    alter_column_table_ddl: type[
-        AlterColumnDDLElementType
-    ] = dataclasses.field(
-        init=False,
-    )
-    add_column_ddl: type[AddColumnDDLElementType] = dataclasses.field(
-        init=False,
-    )
-    drop_column_ddl: type[DropColumnDDLElementType] = dataclasses.field(
-        init=False,
-    )
+    create_table_ddl: type[CreateTableDDLElementType]
+    drop_table_ddl: type[DropTableDDLElementType]
+    alter_column_table_ddl: type[AlterColumnDDLElementType]
+    add_column_ddl: type[AddColumnDDLElementType]
+    drop_column_ddl: type[DropColumnDDLElementType]
 
     def create_table(
         self,
@@ -126,13 +114,6 @@ class BaseOperationsImplementer(
 class BaseOperation(abc.ABC):
     operation: OperationsEnum
 
-    @abc.abstractmethod
-    def to_migration_repr(self) -> str:
-        raise NotImplementedError
-
-    def __repr__(self) -> str:
-        return self.to_migration_repr().replace("'", "")
-
 
 @dataclasses.dataclass(slots=True, frozen=True, repr=False)
 class CreateTableOperation(BaseOperation):
@@ -140,14 +121,14 @@ class CreateTableOperation(BaseOperation):
     to_add_columns_info: list[ColumnInfo]
     operation: OperationsEnum = OperationsEnum.CREATE_TABLE
 
-    def to_migration_repr(self) -> str:
+    def __repr__(self) -> str:
         columns_repr: typing.Final = [
             table_column_info.to_table_column_repr()
             for table_column_info in self.to_add_columns_info
         ]
         return f"""{self.operation}(
                 "{self.table_name}",
-                {[', '.join(columns_repr)]},
+                [{", ".join(columns_repr)}],
             )"""
 
 
@@ -156,7 +137,7 @@ class DropTableOperation(BaseOperation):
     table_name: str
     operation: OperationsEnum = OperationsEnum.DROP_TABLE
 
-    def to_migration_repr(self) -> str:
+    def __repr__(self) -> str:
         return f"""{self.operation}("{self.table_name}")"""
 
 
@@ -167,7 +148,7 @@ class AlterColumnOperation(BaseOperation):
     to_column_info: ColumnInfo
     operation: OperationsEnum = OperationsEnum.ALTER_COLUMN
 
-    def to_migration_repr(self) -> str:
+    def __repr__(self) -> str:
         return f"""{self.operation}(
                 "{self.table_name}",
                 {self.from_column_info.to_table_column_repr()},
@@ -181,7 +162,7 @@ class AddColumnOperation(BaseOperation):
     to_add_column: ColumnInfo
     operation: OperationsEnum = OperationsEnum.ADD_COLUMN
 
-    def to_migration_repr(self) -> str:
+    def __repr__(self) -> str:
         return f"""{self.operation}(
             "{self.table_name}",
             {self.to_add_column.to_table_column_repr()},
@@ -194,7 +175,7 @@ class DropColumnOperation(BaseOperation):
     column_name: str
     operation: OperationsEnum = OperationsEnum.DROP_COLUMN
 
-    def to_migration_repr(self) -> str:
+    def __repr__(self) -> str:
         return f"""{self.operation}(
             "{self.table_name}",
             "{self.column_name}",
