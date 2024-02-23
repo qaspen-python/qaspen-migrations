@@ -1,22 +1,24 @@
 from __future__ import annotations
 import dataclasses
 import importlib
+import pathlib
 import typing
 
 import toml
 from qaspen import BaseTable
 from qaspen.abc.db_engine import BaseEngine
 
-from qaspen_migrations.exceptions import ConfigurationError
+from qaspen_migrations.exceptions import (
+    ConfigurationError,
+    MigrationCorruptionError,
+)
+from qaspen_migrations.migrations.base import BaseMigration
 from qaspen_migrations.settings import (
     QASPEN_MIGRATIONS_TOML_KEY,
     QaspenMigrationsSettings,
     QaspenMigrationTable,
 )
-
-
-if typing.TYPE_CHECKING:
-    import pathlib
+from qaspen_migrations.utils.common import convert_path_to_module
 
 
 T = typing.TypeVar("T")
@@ -102,3 +104,51 @@ class TableLoader:
 
         tables.append(QaspenMigrationTable)
         return tables
+
+
+@dataclasses.dataclass
+class MigrationLoader:
+    engine_type: str
+    migrations_path: str
+
+    def parse_migration(self, migration_module_path: str) -> BaseMigration:
+        migration_module: typing.Final = importlib.import_module(
+            migration_module_path,
+        )
+
+        try:
+            migration_class: typing.Final = migration_module.Migration
+        except AttributeError as exc:
+            raise MigrationCorruptionError(
+                "No migration definition at file "
+                "{migration_module_path} not found.",
+            ) from exc
+        if not issubclass(migration_class, BaseMigration):
+            raise MigrationCorruptionError(
+                "Migration should be subclasses from BaseMigration.",
+            )
+
+        migration_instace: typing.Final = migration_class(
+            self.engine_type,
+        )
+
+        return typing.cast(BaseMigration, migration_instace)
+
+    def load_migrations(self) -> list[BaseMigration]:
+        loaded_migrations: typing.Final = []
+        base_migrations_path: typing.Final = pathlib.Path(self.migrations_path)
+        for migration_file_path in base_migrations_path.glob(
+            "*",
+        ):
+            if migration_file_path.name.startswith("__"):
+                continue
+
+            loaded_migrations.append(
+                self.parse_migration(
+                    convert_path_to_module(
+                        migration_file_path,
+                    ),
+                ),
+            )
+
+        return loaded_migrations

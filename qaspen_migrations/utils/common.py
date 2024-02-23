@@ -5,6 +5,9 @@ import os
 import typing
 
 
+if typing.TYPE_CHECKING:
+    import pathlib
+
 T = typing.TypeVar("T")
 
 
@@ -21,6 +24,10 @@ def convert_abs_path_to_relative(path_to_convert: str | None) -> str:
         path_to_convert = "./" + path_to_convert
 
     return path_to_convert
+
+
+def convert_path_to_module(file_path: pathlib.Path) -> str:
+    return str(file_path).strip(".py").replace("/", ".")
 
 
 def as_coroutine(

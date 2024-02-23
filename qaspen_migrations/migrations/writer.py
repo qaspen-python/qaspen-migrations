@@ -19,7 +19,7 @@ from qaspen_migrations.settings import (
 
 
 if typing.TYPE_CHECKING:
-    from qaspen_migrations.migrations.base import BaseMigration
+    from qaspen_migrations.migrations.versioner import MigrationsVersioner
     from qaspen_migrations.operations.base import BaseOperation
 
 
@@ -40,40 +40,17 @@ jinja_environment.filters["dedent"] = dedent_filter
 
 
 @dataclasses.dataclass
-class MigrationsOperator:
-    migrations_path: str
-    migrations: list[BaseMigration] = dataclasses.field(init=False)
-
-    def __post_init__(self) -> None:
-        self.migrations = self.__load_migrations()
-
-    def __load_migrations(self) -> list[BaseMigration]:
-        return []
-
-    def get_latest_migration_version(self) -> str | None:
-        return None
-
-
-@dataclasses.dataclass
 class MigrationsWriter:
-    migrations_path: str
-    engine_type: str
+    migrations_versioner: MigrationsVersioner
     to_migrate_operations: list[BaseOperation]
     to_rollback_operations: list[BaseOperation]
-    __migrations_loader: MigrationsOperator = dataclasses.field(init=False)
-
-    def __post_init__(self) -> None:
-        self.__migrations_loader = MigrationsOperator(self.migrations_path)
-
-    def parse_ddl_elements_to_import(self) -> list[str]:
-        return []
 
     def generate_migration_name(
         self,
         created_datetime: str,
         version: str,
     ) -> str:
-        return f"{created_datetime}.{version}.py"
+        return f"{created_datetime}_{version}.py"
 
     async def save_migration(self) -> str:
         new_migration_version: typing.Final = uuid.uuid4().hex[:10]
@@ -81,7 +58,7 @@ class MigrationsWriter:
             tz=pytz.UTC,
         ).strftime(MIGRATION_CREATED_DATETIME_FORMAT)
         previous_migration_version: typing.Final = (
-            self.__migrations_loader.get_latest_migration_version()
+            self.migrations_versioner.get_latest_local_migration_version()
         )
 
         migration_template: typing.Final = jinja_environment.get_template(
@@ -92,13 +69,15 @@ class MigrationsWriter:
                 version=new_migration_version,
                 created_datetime=new_migration_created_datetime,
                 previous_version=previous_migration_version,
-                ddl_elemets_to_import=self.parse_ddl_elements_to_import(),
                 elements_to_migrate=self.to_migrate_operations,
                 elements_to_rollback=self.to_rollback_operations,
             )
         )
+
         async with aiofile.async_open(
-            pathlib.Path(self.migrations_path)
+            pathlib.Path(
+                self.migrations_versioner.migrations_loader.migrations_path,
+            )
             / self.generate_migration_name(
                 new_migration_created_datetime,
                 new_migration_version,

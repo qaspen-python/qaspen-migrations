@@ -7,7 +7,9 @@ import click
 import toml
 from click import Context
 
-from qaspen_migrations.migrations.maker import MigrationsMaker
+from qaspen_migrations.migrations.applyer import MigrationsApplyer
+from qaspen_migrations.migrations.maker import MigrationMaker
+from qaspen_migrations.migrations.versioner import MigrationsVersioner
 from qaspen_migrations.settings import (
     QASPEN_MIGRATIONS_TOML_KEY,
     QaspenMigrationsSettings,
@@ -17,6 +19,7 @@ from qaspen_migrations.utils.common import (
     convert_abs_path_to_relative,
 )
 from qaspen_migrations.utils.loaders import (
+    MigrationLoader,
     TableLoader,
     load_config,
     load_engine,
@@ -105,7 +108,7 @@ async def makemigrations(ctx: Context) -> None:
     migrations_config = ctx.obj["config"]
     assert isinstance(migrations_config, QaspenMigrationsSettings)
 
-    await MigrationsMaker(
+    await MigrationMaker(
         engine=load_engine(migrations_config.engine_path),
         migrations_path=migrations_config.migrations_path,
         tables=TableLoader(migrations_config.tables).load_tables(),
@@ -114,11 +117,20 @@ async def makemigrations(ctx: Context) -> None:
 
 @cli.command(help="Apply migrations.")
 @click.pass_context
-def migrate(ctx: Context) -> None:
+@as_coroutine
+async def migrate(ctx: Context) -> None:
     migrations_config = ctx.obj["config"]
     assert isinstance(migrations_config, QaspenMigrationsSettings)
 
-    print("Migrate!")  # noqa: T201
+    await MigrationsApplyer(
+        engine=load_engine(migrations_config.engine_path),
+        migrations_versioner=MigrationsVersioner(
+            MigrationLoader(
+                load_engine(migrations_config.engine_path).engine_type,
+                migrations_config.migrations_path,
+            ),
+        ),
+    ).apply_changes()
 
 
 @cli.command(help="Rollback migrations to certain version.")
