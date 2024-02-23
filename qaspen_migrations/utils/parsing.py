@@ -74,7 +74,11 @@ def table_column_to_column_info(
         ),
         db_column_name=table_column._column_data.column_name,
         is_null=table_column._column_data.is_null,
-        database_default=table_column._column_data.database_default,
+        database_default=(
+            table_column._column_data.database_default.lower()
+            if table_column._column_data.database_default is not None
+            else None
+        ),
         max_length=(
             parse_int_attribute(inner_column, "_max_length")
             or parse_int_attribute(table_column, "_max_length")

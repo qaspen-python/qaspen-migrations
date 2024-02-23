@@ -9,7 +9,6 @@ from qaspen_migrations.exceptions import ColumnParsingError
 from qaspen_migrations.inspector.base import BaseInspector
 from qaspen_migrations.schema import ColumnInfo
 from qaspen_migrations.types_mapping import POSTGRES_TYPE_MAPPING
-from qaspen_migrations.utils.parsing import parse_int_attribute
 
 
 if typing.TYPE_CHECKING:
@@ -26,7 +25,7 @@ def _parse_numeric_attributes(
         return None
     try:
         return int(attribute_value)  # type: ignore[arg-type]
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
 
@@ -91,10 +90,7 @@ class PostgresInspector(
             ) from exception
 
         is_null: typing.Final = bool(incoming_data.get("is_null") == "YES")
-        max_length: typing.Final = parse_int_attribute(
-            incoming_data,
-            "max_length",
-        )
+        max_length: typing.Final = incoming_data.get("max_length")
         database_default = incoming_data.get("database_default")
         scale: typing.Final = _parse_numeric_attributes(
             "scale",
